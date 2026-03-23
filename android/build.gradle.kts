@@ -1,3 +1,8 @@
+plugins {
+    // Dépendance pour le plugin Google Services
+    id("com.google.gms.google-services") version "4.4.4" apply false
+}
+
 allprojects {
     repositories {
         google()

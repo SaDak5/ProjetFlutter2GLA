@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "475152410385",
+    "project_id": "libcity-4d07b",
+    "storage_bucket": "libcity-4d07b.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:475152410385:android:5cd3b4aaea24a105d44eb0",
+        "android_client_info": {
+          "package_name": "com.example.libcity"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCelfwNGbkq8ZHc_3l_VOueg1rdAVAYwRM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
