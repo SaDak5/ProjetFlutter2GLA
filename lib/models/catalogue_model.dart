@@ -1,103 +1,96 @@
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 
 class CatalogueModel {
   final String id;
-  final String name;
+  final String nom;
   final String description;
-  final double price;
-  final String imageUrl;      // URL Firestore après upload
-  final DateTime createdAt;
-  final bool isAvailable;
-  
-  // Attribut temporaire pour l'upload (non stocké dans Firestore)
-  File? localImage;
+  final String auteur;
+  final double prix;
+  final String imageBase64;
+  final DateTime dateCreation;
+  final bool estDisponible;
+  final String categorie;
+  final int nbExemplaires;           // Nombre total d'exemplaires
+  final int nbExemplairesDisponibles; // Nombre d'exemplaires disponibles
   
   CatalogueModel({
     required this.id,
-    required this.name,
+    required this.nom,
     required this.description,
-    required this.price,
-    required this.imageUrl,
-    required this.createdAt,
-    this.isAvailable = true,
-    this.localImage,
+    required this.auteur,
+    required this.prix,
+    required this.imageBase64,
+    required this.dateCreation,
+    this.estDisponible = true,
+    required this.categorie,
+    required this.nbExemplaires,
+    required this.nbExemplairesDisponibles,
   });
-  
-  // Constructeur vide pour formulaire
-  CatalogueModel.empty({
-    String? id,
-  }) : this(
-    id: id ?? DateTime.now().millisecondsSinceEpoch.toString(),
-    name: '',
-    description: '',
-    price: 0.0,
-    imageUrl: '',
-    createdAt: DateTime.now(),
-    isAvailable: true,
-  );
   
   factory CatalogueModel.fromMap(Map<String, dynamic> data, String id) {
     return CatalogueModel(
       id: id,
-      name: data['name'] ?? '',
+      nom: data['nom'] ?? '',
       description: data['description'] ?? '',
-      price: (data['price'] ?? 0).toDouble(),
-      imageUrl: data['imageUrl'] ?? '',
-      createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
-      isAvailable: data['isAvailable'] ?? true,
+      auteur: data['auteur'] ?? '',
+      prix: (data['prix'] ?? 0).toDouble(),
+      imageBase64: data['imageBase64'] ?? '',
+      dateCreation: (data['dateCreation'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      estDisponible: data['estDisponible'] ?? true,
+      categorie: data['categorie'] ?? 'Non classé',
+      nbExemplaires: (data['nbExemplaires'] ?? 1).toInt(),
+      nbExemplairesDisponibles: (data['nbExemplairesDisponibles'] ?? 1).toInt(),
     );
   }
   
   Map<String, dynamic> toMap() {
     return {
-      'name': name,
+      'nom': nom,
       'description': description,
-      'price': price,
-      'imageUrl': imageUrl,
-      'createdAt': Timestamp.fromDate(createdAt),
-      'isAvailable': isAvailable,
+      'auteur': auteur,
+      'prix': prix,
+      'imageBase64': imageBase64,
+      'dateCreation': Timestamp.fromDate(dateCreation),
+      'estDisponible': estDisponible,
+      'categorie': categorie,
+      'nbExemplaires': nbExemplaires,
+      'nbExemplairesDisponibles': nbExemplairesDisponibles,
     };
-  }
-  
-  // Méthode pour uploader l'image vers Firebase Storage
-  Future<String> uploadImage() async {
-    if (localImage == null) return imageUrl;
-    
-    try {
-      final storageRef = FirebaseStorage.instance
-          .ref()
-          .child('catalogues')
-          .child('$id.jpg');
-      
-      await storageRef.putFile(localImage!);
-      final downloadUrl = await storageRef.getDownloadURL();
-      return downloadUrl;
-    } catch (e) {
-      throw Exception('Erreur upload image: $e');
-    }
   }
   
   CatalogueModel copyWith({
     String? id,
-    String? name,
+    String? nom,
     String? description,
-    double? price,
-    String? imageUrl,
-    DateTime? createdAt,
-    bool? isAvailable,
-    File? localImage,
+    String? auteur,
+    double? prix,
+    String? imageBase64,
+    DateTime? dateCreation,
+    bool? estDisponible,
+    String? categorie,
+    int? nbExemplaires,
+    int? nbExemplairesDisponibles,
   }) {
     return CatalogueModel(
       id: id ?? this.id,
-      name: name ?? this.name,
+      nom: nom ?? this.nom,
       description: description ?? this.description,
-      price: price ?? this.price,
-      imageUrl: imageUrl ?? this.imageUrl,
-      createdAt: createdAt ?? this.createdAt,
-      isAvailable: isAvailable ?? this.isAvailable,
-      localImage: localImage ?? this.localImage,
+      auteur: auteur ?? this.auteur,
+      prix: prix ?? this.prix,
+      imageBase64: imageBase64 ?? this.imageBase64,
+      dateCreation: dateCreation ?? this.dateCreation,
+      estDisponible: estDisponible ?? this.estDisponible,
+      categorie: categorie ?? this.categorie,
+      nbExemplaires: nbExemplaires ?? this.nbExemplaires,
+      nbExemplairesDisponibles: nbExemplairesDisponibles ?? this.nbExemplairesDisponibles,
     );
+  }
+  
+  bool get estDisponibleEmprunt => nbExemplairesDisponibles > 0;
+  String get statutDisponibilite {
+    if (nbExemplairesDisponibles <= 0) return 'Indisponible';
+    if (nbExemplairesDisponibles == 1) return '1 exemplaire disponible';
+    return '$nbExemplairesDisponibles exemplaires disponibles';
   }
 }

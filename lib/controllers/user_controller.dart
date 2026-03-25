@@ -1,44 +1,138 @@
+import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../models/user_model.dart';
 import '../services/user_service.dart';
 
-class UserController {
-  final UserService _userService = UserService();
-
-  // =============== TEST DE CONNEXION ===============
-
-  Future<bool> testFirestoreConnection() async {
-    print('🔄 Test de connexion via Controller...');
-
+class UserController extends ChangeNotifier {
+  final UserService _service = UserService();
+  
+  UserModel? _currentUser;
+  List<UserModel> _users = [];
+  bool _isLoading = false;
+  String? _error;
+  
+  UserModel? get currentUser => _currentUser;
+  List<UserModel> get users => _users;
+  bool get isLoading => _isLoading;
+  String? get error => _error;
+  bool get isAdmin => _currentUser?.role == 'admin';
+  
+  Future<void> loadCurrentUser() async {
+    _isLoading = true;
+    notifyListeners();
+    _currentUser = await _service.getCurrentUser();
+    _isLoading = false;
+    notifyListeners();
+  }
+  
+  // 👈 Version corrigée avec plus de logs
+  Future<void> loadAllUsers() async {
+    _isLoading = true;
+    notifyListeners();
     try {
-      bool result = await _userService.testFirestoreConnection();
-
-      if (result) {
-        print('✅ Connexion Firestore OK');
-      } else {
-        print('❌ Connexion Firestore échouée');
-      }
-
-      return result;
+      print('🔍 Chargement des utilisateurs...');
+      _users = await _service.getAllUsers();
+      print('✅ ${_users.length} utilisateurs chargés');
+      _error = null;
     } catch (e) {
-      print('❌ Erreur Controller: $e');
-      return false;
+      _error = e.toString();
+      print('❌ Erreur loadAllUsers: $e');
+    } finally {
+      _isLoading = false;
+      notifyListeners();
     }
   }
-
-  // =============== RÉCUPÉRATION DES UTILISATEURS ===============
-
-  Future<List<UserModel>> getAllUsers() async {
+  
+  // 👈 Charger uniquement les usagers
+  Future<void> loadUsagers() async {
+    _isLoading = true;
+    notifyListeners();
     try {
-      print('🔄 Controller: récupération des utilisateurs...');
-
-      List<UserModel> users = await _userService.getAllUsers();
-
-      print('📊 Nombre d\'utilisateurs: ${users.length}');
-
-      return users;
+      print('🔍 Chargement des usagers...');
+      _users = await _service.getUsagers();
+      print('✅ ${_users.length} usagers chargés');
+      _error = null;
     } catch (e) {
-      print('❌ Erreur Controller getAllUsers: $e');
-      return [];
+      _error = e.toString();
+      print('❌ Erreur loadUsagers: $e');
+    } finally {
+      _isLoading = false;
+      notifyListeners();
     }
+  }
+  
+  Future<bool> addUser({
+    required String email,
+    required String nom,
+    required String prenom,
+    required String password,
+  }) async {
+    _isLoading = true;
+    notifyListeners();
+    try {
+      print('➕ Création utilisateur: $email');
+      final userCredential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+      
+      final newUser = UserModel(
+        uid: userCredential.user!.uid,
+        nom: nom,
+        prenom: prenom,
+        email: email,
+        role: 'user',
+        createdAt: DateTime.now(),
+      );
+      
+      await _service.createUser(newUser);
+      await loadAllUsers();
+      print('✅ Utilisateur créé avec succès');
+      return true;
+    } catch (e) {
+      _error = e.toString();
+      print('❌ Erreur addUser: $e');
+      return false;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+  
+  Future<bool> updateUser(UserModel user) async {
+    _isLoading = true;
+    notifyListeners();
+    try {
+      await _service.updateUser(user);
+      await loadAllUsers();
+      return true;
+    } catch (e) {
+      _error = e.toString();
+      return false;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+  
+  Future<bool> deleteUser(String uid) async {
+    _isLoading = true;
+    notifyListeners();
+    try {
+      await _service.deleteUser(uid);
+      await loadAllUsers();
+      return true;
+    } catch (e) {
+      _error = e.toString();
+      return false;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+  
+  void clearError() {
+    _error = null;
+    notifyListeners();
   }
 }

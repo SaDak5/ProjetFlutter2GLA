@@ -45,4 +45,6 @@ class UserModel {
   String toString() {
     return 'UserModel(uid: $uid, nom: $nom, prenom: $prenom, email: $email, role: $role)';
   }
+
+   bool get isAdmin => role == 'admin';
 }

@@ -26,7 +26,7 @@ class _LoginPageState extends State<LoginPage> {
 
     if (user != null && mounted) {
       _showSnackBar("Connexion réussie !", Colors.green);
-      Navigator.pushReplacementNamed(context, '/');
+      Navigator.pushReplacementNamed(context, '/main_page');
     } else if (mounted) {
       _showSnackBar("Email ou mot de passe incorrect", Colors.red);
     }

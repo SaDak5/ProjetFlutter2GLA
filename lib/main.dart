@@ -1,9 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_app_check/firebase_app_check.dart';
+import 'package:libcity/controllers/emprunt_controller.dart';
+import 'package:libcity/controllers/reservation_controller.dart';
+import 'package:libcity/views/emprunts.dart';
+import 'package:libcity/views/gestion_utilisateurs.dart';
+import 'package:libcity/views/home_page.dart';
+import 'package:libcity/views/reservations.dart';
+import 'package:provider/provider.dart';
 import 'views/login.dart';
 import 'views/signup.dart';
-import 'views/home_page.dart';
+import 'views/main_page.dart';
+import 'views/catalogue.dart';
+import 'views/evenements.dart';
+import 'controllers/catalogue_controller.dart';
+import 'controllers/evenement_controller.dart';
+import 'controllers/user_controller.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -12,9 +24,12 @@ void main() async {
     await Firebase.initializeApp();
     print('✅ Firebase initialisé avec succès');
     
-    // Vérification supplémentaire
-    final auth = FirebaseAuth.instance;
-    print('✅ Firebase Auth disponible');
+    // Activer App Check pour le développement (évite l'erreur réseau)
+    await FirebaseAppCheck.instance.activate(
+      androidProvider: AndroidProvider.debug,
+      appleProvider: AppleProvider.debug,
+    );
+    print('✅ App Check configuré en mode debug');
     
   } catch (e) {
     print('❌ Erreur Firebase: $e');
@@ -58,20 +73,34 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Mediacité',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        primarySwatch: Colors.deepPurple,
-        useMaterial3: true,
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => CatalogueController()),
+        ChangeNotifierProvider(create: (_) => EvenementController()),
+        ChangeNotifierProvider(create: (_) => UserController()),
+        ChangeNotifierProvider(create: (_) => EmpruntController()),
+        ChangeNotifierProvider(create: (_) => ReservationController()),
+      ],
+      child: MaterialApp(
+        title: 'Mediacité',
+        debugShowCheckedModeBanner: false,
+        theme: ThemeData(
+          primarySwatch: Colors.deepPurple,
+          useMaterial3: true,
+        ),
+        initialRoute: '/',
+        routes: {
+          '/': (context) => const HomePage(),
+          '/login': (context) => const LoginPage(),
+          '/signup': (context) => const SignupPage(),
+          '/catalogue': (context) => const CataloguePage(),
+          '/evenements': (context) => const EvenementsPage(),
+          '/main_page': (context) => const MainPage(),
+          '/emprunts': (context) => const EmpruntsPage(),
+          '/reservations': (context) => const ReservationsPage(),
+          '/gestion_utilisateurs': (context) => const GestionUtilisateursPage(),
+        },
       ),
-      initialRoute: '/',
-      routes: {
-        '/': (context) => const HomePage(),
-        '/login': (context) => const LoginPage(),
-        '/signup': (context) => const SignupPage(),
-        
-      },
     );
   }
 }
