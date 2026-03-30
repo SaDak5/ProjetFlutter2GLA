@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:libcity/models/reservation_model.dart';
 import 'package:provider/provider.dart';
 import '../controllers/emprunt_controller.dart';
-import '../controllers/reservation_controller.dart';
 import '../controllers/user_controller.dart';
 
 class MainPage extends StatefulWidget {
@@ -17,58 +15,43 @@ class _MainPageState extends State<MainPage> {
   @override
   void initState() {
     super.initState();
+    // Chargement des données dès l'ouverture de l'application
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final userId = FirebaseAuth.instance.currentUser?.uid;
       if (userId != null) {
-        Provider.of<EmpruntController>(context, listen: false).chargerMesEmprunts(userId);
-        Provider.of<ReservationController>(context, listen: false).chargerMesReservations(userId);
+        Provider.of<EmpruntController>(context, listen: false)
+            .chargerMesEmprunts(userId);
+        Provider.of<UserController>(context, listen: false)
+            .loadCurrentUser();
       }
-      Provider.of<UserController>(context, listen: false).loadCurrentUser();
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    final user = FirebaseAuth.instance.currentUser;
-    final isAdmin = Provider.of<UserController>(context).isAdmin;
+    final userAuth = FirebaseAuth.instance.currentUser;
+    final userController = Provider.of<UserController>(context);
     
+    // Données issues du UserController (Collection Users)
+    final isAdmin = userController.isAdmin;
+    final limiteEmprunts = userController.limiteEmprunts;
+    final nbEmpruntsActifs = userController.currentUser?.nbEmpruntsActifs ?? 0;
+
     return Scaffold(
+      backgroundColor: const Color(0xFFF8F9FA),
       appBar: AppBar(
         title: const Text(
           'Mediacité',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-          ),
+          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
         ),
         backgroundColor: const Color(0xFF003366),
         actions: [
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            child: Center(
-              child: CircleAvatar(
-                backgroundColor: const Color(0xFF800020),
-                radius: 18,
-                child: Text(
-                  user?.email?.split('@').first[0].toUpperCase() ?? 'U',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                  ),
-                ),
-              ),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.only(right: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 12),
             child: Center(
               child: Text(
-                user?.email?.split('@').first ?? 'Utilisateur',
-                style: const TextStyle(
-                  fontSize: 14,
-                  color: Colors.white,
-                ),
+                userAuth?.email?.split('@').first ?? 'Utilisateur',
+                style: const TextStyle(color: Colors.white),
               ),
             ),
           ),
@@ -80,7 +63,6 @@ class _MainPageState extends State<MainPage> {
                 Navigator.pushReplacementNamed(context, '/login');
               }
             },
-            tooltip: 'Déconnexion',
           ),
         ],
       ),
@@ -89,152 +71,97 @@ class _MainPageState extends State<MainPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Message de bienvenue
+            // --- SECTION BIENVENUE ---
             const Text(
               'Bonjour,',
-              style: TextStyle(
-                fontSize: 28,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF003366),
-              ),
+              style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Color(0xFF003366)),
             ),
             Text(
-              user?.email?.split('@').first ?? 'Utilisateur',
-              style: const TextStyle(
-                fontSize: 20,
-                color: Color(0xFF800020),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Découvrez tous nos services',
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey[600],
-              ),
+              userAuth?.email?.split('@').first ?? 'Utilisateur',
+              style: const TextStyle(fontSize: 20, color: Color(0xFF800020)),
             ),
             const SizedBox(height: 32),
-            
-            // 3 Cartes principales
-            IntrinsicHeight(
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Expanded(
-                    child: _buildServiceCard(
-                      context,
-                      icon: Icons.inventory,
-                      title: 'Catalogue',
-                      description: 'Consultez notre collection',
-                      onTap: () => Navigator.pushNamed(context, '/catalogue'),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: _buildServiceCard(
-                      context,
-                      icon: Icons.event,
-                      title: 'Événements',
-                      description: 'Découvrez nos animations',
-                      onTap: () => Navigator.pushNamed(context, '/evenements'),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: _buildServiceCard(
-                      context,
-                      icon: Icons.book,
-                      title: 'Emprunts',
-                      description: 'Gérez vos réservations',
-                      onTap: () => Navigator.pushNamed(context, '/emprunts'),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            
-            const SizedBox(height: 24),
-            
-            // Cartes Emprunts et Réservations
+
+            // --- GRILLE DES SERVICES ---
             Row(
               children: [
                 Expanded(
-                  child: Consumer<EmpruntController>(
-                    builder: (context, controller, child) {
-                      final nbEmprunts = controller.mesEmprunts.length;
-                      final nbRetards = controller.mesEmprunts.where((e) => e.estEnRetard).length;
-                      
-                      return _buildStatusCard(
-                        context,
-                        icon: Icons.book,
-                        title: 'Mes Emprunts',
-                        count: nbEmprunts,
-                        subtitle: nbRetards > 0 ? '$nbRetards en retard' : 'Aucun retard',
-                        color: nbRetards > 0 ? const Color(0xFF800020) : const Color(0xFF003366),
-                        onTap: () => Navigator.pushNamed(context, '/emprunts'),
-                      );
-                    },
+                  child: _buildServiceCard(
+                    context,
+                    icon: Icons.inventory,
+                    title: 'Catalogue',
+                    onTap: () => Navigator.pushNamed(context, '/catalogue'),
                   ),
                 ),
                 const SizedBox(width: 16),
                 Expanded(
-                  child: Consumer<ReservationController>(
-                    builder: (context, controller, child) {
-                      final nbReservations = controller.mesReservations.length;
-                      final nbDisponibles = controller.mesReservations
-                          .where((r) => r.statut == StatusReservation.disponible)
-                          .length;
-                      
-                      return _buildStatusCard(
-                        context,
-                        icon: Icons.schedule,
-                        title: 'Mes Réservations',
-                        count: nbReservations,
-                        subtitle: nbDisponibles > 0 ? '$nbDisponibles disponible(s)' : 'En attente',
-                        color: nbDisponibles > 0 ? Colors.green : const Color(0xFF003366),
-                        onTap: () => Navigator.pushNamed(context, '/reservations'),
-                      );
-                    },
+                  child: _buildServiceCard(
+                    context,
+                    icon: Icons.event,
+                    title: 'Événements',
+                    onTap: () => Navigator.pushNamed(context, '/evenements'),
                   ),
                 ),
               ],
             ),
-            
+
             const SizedBox(height: 24),
-            
-            // 👈 Carte ADMIN (visible seulement pour les administrateurs)
-            if (isAdmin)
-              Container(
-                margin: const EdgeInsets.symmetric(vertical: 8),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF800020), Color(0xFF003366)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: ListTile(
-                  onTap: () => Navigator.pushNamed(context, '/gestion_utilisateurs'),
-                  leading: const CircleAvatar(
-                    backgroundColor: Colors.white,
-                    child: Icon(Icons.admin_panel_settings, color: Color(0xFF800020)),
-                  ),
-                  title: const Text(
-                    'Administration',
-                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                  ),
-                  subtitle: const Text(
-                    'Gérer les utilisateurs',
-                    style: TextStyle(color: Colors.white70),
-                  ),
-                  trailing: const Icon(Icons.arrow_forward_ios, color: Colors.white),
-                ),
+
+            // --- CARTE MES EMPRUNTS (Compteur synchronisé avec la DB) ---
+            _buildStatusCard(
+              context,
+              icon: Icons.book,
+              title: 'Mes Emprunts',
+              count: nbEmpruntsActifs, // Utilise la valeur exacte de la collection users
+              maxCount: limiteEmprunts,
+              subtitle: nbEmpruntsActifs > 0 
+                  ? 'Vous avez $nbEmpruntsActifs livre(s) en main' 
+                  : 'Aucun emprunt en cours',
+              onTap: () => Navigator.pushNamed(context, '/emprunts'),
+            ),
+
+            const SizedBox(height: 24),
+
+            // --- 🛡️ SECTION ADMINISTRATION (Si Admin) ---
+            if (isAdmin) ...[
+              const Text(
+                'Administration',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF003366)),
               ),
-            
-            const SizedBox(height: 16),
-            
-            // Section Informations
+              const SizedBox(height: 12),
+              
+              _buildSimpleActionCard(
+                context,
+                icon: Icons.history,
+                title: 'Historique des activités',
+                description: 'Suivi global des mouvements',
+                iconColor: Colors.teal,
+                onTap: () => Navigator.pushNamed(context, '/historique'),
+              ),
+              const SizedBox(height: 12),
+
+              _buildSimpleActionCard(
+                context,
+                icon: Icons.dashboard_rounded,
+                title: 'Tableau de bord',
+                description: 'Statistiques de la médiathèque',
+                iconColor: const Color(0xFF003366),
+                onTap: () => Navigator.pushNamed(context, '/dashboard'),
+              ),
+              const SizedBox(height: 12),
+
+              _buildSimpleActionCard(
+                context,
+                icon: Icons.people_alt,
+                title: 'Gestion Utilisateurs',
+                description: 'Comptes et permissions',
+                iconColor: const Color(0xFF800020),
+                onTap: () => Navigator.pushNamed(context, '/gestion_utilisateurs'),
+              ),
+              const SizedBox(height: 24),
+            ],
+
+            // --- SECTION INFORMATIONS PRATIQUES ---
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(20),
@@ -242,29 +169,18 @@ class _MainPageState extends State<MainPage> {
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(color: Colors.grey[200]!),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.grey.withOpacity(0.1),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
                     'Informations pratiques',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF003366),
-                    ),
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF003366)),
                   ),
                   const SizedBox(height: 16),
-                  _buildInfoRow(Icons.access_time, 'Horaires', 'Lundi - Samedi: 10h - 19h\nDimanche: 14h - 18h'),
+                  _buildInfoRow(Icons.access_time, 'Horaires', 'Lun-Sam: 10h-19h / Dim: 14h-18h'),
                   const Divider(height: 24),
-                  _buildInfoRow(Icons.location_on, 'Adresse', '12 rue de la Médiathèque\n75001 Paris'),
+                  _buildInfoRow(Icons.location_on, 'Adresse', '12 rue de la Médiathèque, Paris'),
                   const Divider(height: 24),
                   _buildInfoRow(Icons.phone, 'Téléphone', '01 23 45 67 89'),
                   const Divider(height: 24),
@@ -272,86 +188,16 @@ class _MainPageState extends State<MainPage> {
                 ],
               ),
             ),
-            
             const SizedBox(height: 24),
           ],
         ),
       ),
     );
   }
-  
-  Widget _buildServiceCard(
-    BuildContext context, {
-    required IconData icon,
-    required String title,
-    required String description,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 12),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.grey[200]!),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.grey.withOpacity(0.05),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: const Color(0xFF003366).withOpacity(0.1),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                icon,
-                size: 28,
-                color: const Color(0xFF003366),
-              ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              title,
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF003366),
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              description,
-              style: TextStyle(
-                fontSize: 11,
-                color: Colors.grey[600],
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-  
-  Widget _buildStatusCard(
-    BuildContext context, {
-    required IconData icon,
-    required String title,
-    required int count,
-    required String subtitle,
-    required Color color,
-    required VoidCallback onTap,
-  }) {
+
+  // --- WIDGETS DE CONSTRUCTION UI ---
+
+  Widget _buildServiceCard(BuildContext context, {required IconData icon, required String title, required VoidCallback onTap}) {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(16),
@@ -360,112 +206,99 @@ class _MainPageState extends State<MainPage> {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.grey[200]!),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.grey.withOpacity(0.05),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
+          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 10)],
+        ),
+        child: Column(
+          children: [
+            Icon(icon, size: 30, color: const Color(0xFF003366)),
+            const SizedBox(height: 8),
+            Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatusCard(BuildContext context, {required IconData icon, required String title, required int count, required int maxCount, required String subtitle, required VoidCallback onTap}) {
+    final bool limiteAtteinte = count >= maxCount;
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: limiteAtteinte ? Colors.red.shade200 : Colors.grey[200]!),
         ),
         child: Row(
           children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(
-                icon,
-                size: 24,
-                color: color,
-              ),
-            ),
+            Icon(icon, color: const Color(0xFF003366)),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF003366),
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    '$count élément${count > 1 ? 's' : ''}',
-                    style: const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF800020),
-                    ),
-                  ),
-                  Text(
-                    subtitle,
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: Colors.grey[600],
-                    ),
-                  ),
+                  Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+                  Text(subtitle, style: TextStyle(fontSize: 12, color: Colors.grey[600])),
                 ],
               ),
             ),
-            const Icon(
-              Icons.arrow_forward_ios,
-              size: 14,
-              color: Colors.grey,
+            Text(
+              '$count / $maxCount', 
+              style: TextStyle(
+                fontWeight: FontWeight.bold, 
+                color: limiteAtteinte ? Colors.red : const Color(0xFF800020),
+                fontSize: 18
+              )
             ),
           ],
         ),
       ),
     );
   }
-  
+
+  Widget _buildSimpleActionCard(BuildContext context, {required IconData icon, required String title, required String description, required Color iconColor, required VoidCallback onTap}) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.grey[100]!),
+        ),
+        child: Row(
+          children: [
+            CircleAvatar(
+              backgroundColor: iconColor.withOpacity(0.1),
+              child: Icon(icon, color: iconColor, size: 20),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                  Text(description, style: TextStyle(fontSize: 11, color: Colors.grey[500])),
+                ],
+              ),
+            ),
+            const Icon(Icons.arrow_forward_ios, size: 14, color: Colors.grey),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildInfoRow(IconData icon, String label, String value) {
     return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: const Color(0xFF800020).withOpacity(0.1),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Icon(
-            icon,
-            size: 18,
-            color: const Color(0xFF800020),
-          ),
-        ),
+        Icon(icon, color: const Color(0xFF800020), size: 20),
         const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                label,
-                style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                  color: Color(0xFF003366),
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                value,
-                style: TextStyle(
-                  fontSize: 13,
-                  color: Colors.grey[700],
-                ),
-              ),
-            ],
-          ),
-        ),
+        Expanded(child: Text('$label : $value', style: const TextStyle(fontSize: 13))),
       ],
     );
   }

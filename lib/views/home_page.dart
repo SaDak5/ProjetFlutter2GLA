@@ -140,8 +140,6 @@ class _HomePageState extends State<HomePage> {
             
             const SizedBox(height: 16),
             
-         
-            
             // Informations
             const Text('Horaires', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
@@ -188,6 +186,8 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildCatalogueCard(CatalogueModel item) {
+    final estDisponible = item.nbExemplairesDisponibles > 0;
+    
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       elevation: 2,
@@ -264,13 +264,20 @@ class _HomePageState extends State<HomePage> {
                       ),
                     ),
                     const SizedBox(height: 4),
-                    Text(
-                      'Prix: ${item.prix.toStringAsFixed(2)} DT',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF006400),
-                      ),
+                    Row(
+                      children: [
+                        const Icon(Icons.inventory, size: 12, color: Colors.grey),
+                        const SizedBox(width: 4),
+                        Text(
+                          estDisponible 
+                              ? '${item.nbExemplairesDisponibles} exemplaire(s) disponible(s)'
+                              : 'Indisponible',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: estDisponible ? Colors.green : Colors.red,
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),

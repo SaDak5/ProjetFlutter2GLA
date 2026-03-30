@@ -1,5 +1,4 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/material.dart';
 
 class EmpruntModel {
   final String id;
@@ -7,33 +6,27 @@ class EmpruntModel {
   final String catalogueId;
   final String titre;
   final String auteur;
-  final String imageUrl;
+  final String imageBase64;
   final DateTime dateEmprunt;
   final DateTime dateRetourPrevu;
-  DateTime? dateRetourEffectif;
-  final StatusEmprunt statut;
-  final int prolongations;
-  final String codeBarres;
-  final bool rappelEnvoye;
-  final double amende;
-  
+  final DateTime? dateRetourEffective; // Optionnel : pour savoir quand il a été rendu
+  final int nbExemplaires;
+  final String statut; // 'actif' ou 'retourne'
+
   EmpruntModel({
     required this.id,
     required this.userId,
     required this.catalogueId,
     required this.titre,
     required this.auteur,
-    required this.imageUrl,
+    required this.imageBase64,
     required this.dateEmprunt,
     required this.dateRetourPrevu,
-    this.dateRetourEffectif,
-    this.statut = StatusEmprunt.enCours,
-    this.prolongations = 0,
-    required this.codeBarres,
-    this.rappelEnvoye = false,
-    this.amende = 0,
+    this.dateRetourEffective,
+    this.nbExemplaires = 1,
+    this.statut = 'actif', // Par défaut à la création
   });
-  
+
   factory EmpruntModel.fromMap(Map<String, dynamic> data, String id) {
     return EmpruntModel(
       id: id,
@@ -41,62 +34,27 @@ class EmpruntModel {
       catalogueId: data['catalogueId'] ?? '',
       titre: data['titre'] ?? '',
       auteur: data['auteur'] ?? '',
-      imageUrl: data['imageUrl'] ?? '',
+      imageBase64: data['imageBase64'] ?? '',
       dateEmprunt: (data['dateEmprunt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       dateRetourPrevu: (data['dateRetourPrevu'] as Timestamp?)?.toDate() ?? DateTime.now(),
-      dateRetourEffectif: (data['dateRetourEffectif'] as Timestamp?)?.toDate(),
-      statut: StatusEmprunt.values.firstWhere(
-        (e) => e.toString() == data['statut'],
-        orElse: () => StatusEmprunt.enCours,
-      ),
-      prolongations: data['prolongations'] ?? 0,
-      codeBarres: data['codeBarres'] ?? '',
-      rappelEnvoye: data['rappelEnvoye'] ?? false,
-      amende: (data['amende'] ?? 0).toDouble(),
+      dateRetourEffective: (data['dateRetourEffective'] as Timestamp?)?.toDate(),
+      nbExemplaires: (data['nbExemplaires'] ?? 1).toInt(),
+      statut: data['statut'] ?? 'actif',
     );
   }
-  
+
   Map<String, dynamic> toMap() {
     return {
       'userId': userId,
       'catalogueId': catalogueId,
       'titre': titre,
       'auteur': auteur,
-      'imageUrl': imageUrl,
+      'imageBase64': imageBase64,
       'dateEmprunt': Timestamp.fromDate(dateEmprunt),
       'dateRetourPrevu': Timestamp.fromDate(dateRetourPrevu),
-      'dateRetourEffectif': dateRetourEffectif != null ? Timestamp.fromDate(dateRetourEffectif!) : null,
-      'statut': statut.toString(),
-      'prolongations': prolongations,
-      'codeBarres': codeBarres,
-      'rappelEnvoye': rappelEnvoye,
-      'amende': amende,
+      'dateRetourEffective': dateRetourEffective != null ? Timestamp.fromDate(dateRetourEffective!) : null,
+      'nbExemplaires': nbExemplaires,
+      'statut': statut,
     };
-  }
-  
-  bool get estEnRetard => DateTime.now().isAfter(dateRetourPrevu) && statut == StatusEmprunt.enCours;
-  int get joursDeRetard => estEnRetard ? DateTime.now().difference(dateRetourPrevu).inDays : 0;
-  double get calculerAmende => joursDeRetard * 1.0;
-  bool get peutProlonger => statut == StatusEmprunt.enCours && prolongations < 2 && !estEnRetard;
-}
-
-enum StatusEmprunt { enCours, termine, enRetard, annule }
-
-extension StatusEmpruntExtension on StatusEmprunt {
-  String get libelle {
-    switch (this) {
-      case StatusEmprunt.enCours: return 'En cours';
-      case StatusEmprunt.termine: return 'Terminé';
-      case StatusEmprunt.enRetard: return 'En retard';
-      case StatusEmprunt.annule: return 'Annulé';
-    }
-  }
-  Color get couleur {
-    switch (this) {
-      case StatusEmprunt.enCours: return const Color(0xFF003366);
-      case StatusEmprunt.termine: return const Color(0xFF006400);
-      case StatusEmprunt.enRetard: return const Color(0xFF800020);
-      case StatusEmprunt.annule: return Colors.grey;
-    }
   }
 }

@@ -11,12 +11,21 @@ class GestionUtilisateursPage extends StatefulWidget {
 }
 
 class _GestionUtilisateursPageState extends State<GestionUtilisateursPage> {
+  final TextEditingController _searchController = TextEditingController();
+  List<UserModel> _filteredUsers = [];
+  
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Provider.of<UserController>(context, listen: false).loadAllUsers();
     });
+  }
+  
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   @override
@@ -36,69 +45,141 @@ class _GestionUtilisateursPageState extends State<GestionUtilisateursPage> {
           ),
         ],
       ),
-      body: Consumer<UserController>(
-        builder: (context, controller, child) {
-          if (controller.isLoading) {
-            return const Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  CircularProgressIndicator(),
-                  SizedBox(height: 16),
-                  Text('Chargement des utilisateurs...'),
-                ],
+      body: Column(
+        children: [
+          // Barre de recherche
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: TextField(
+              controller: _searchController,
+              decoration: InputDecoration(
+                hintText: 'Rechercher par nom ou prénom...',
+                prefixIcon: const Icon(Icons.search),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                filled: true,
+                fillColor: Colors.white,
+                suffixIcon: _searchController.text.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear),
+                        onPressed: () {
+                          _searchController.clear();
+                          _filterUsers();
+                        },
+                      )
+                    : null,
               ),
-            );
-          }
-          
-          if (controller.error != null) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.error_outline, size: 64, color: Colors.red),
-                  const SizedBox(height: 16),
-                  Text(controller.error!, style: const TextStyle(color: Colors.red)),
-                  const SizedBox(height: 16),
-                  ElevatedButton(
-                    onPressed: controller.loadAllUsers,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF003366),
-                    ),
-                    child: const Text('Réessayer'),
-                  ),
-                ],
-              ),
-            );
-          }
-          
-          if (controller.users.isEmpty) {
-            return const Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.people, size: 64, color: Colors.grey),
-                  SizedBox(height: 16),
-                  Text('Aucun utilisateur', style: TextStyle(color: Colors.grey)),
-                  SizedBox(height: 8),
-                  Text('Appuyez sur + pour ajouter', style: TextStyle(fontSize: 12, color: Colors.grey)),
-                ],
-              ),
-            );
-          }
-          
-          return RefreshIndicator(
-            onRefresh: controller.loadAllUsers,
-            color: const Color(0xFF003366),
-            child: ListView.builder(
-              padding: const EdgeInsets.all(12),
-              itemCount: controller.users.length,
-              itemBuilder: (context, index) => _buildUserCard(controller.users[index], controller),
+              onChanged: (_) => _filterUsers(),
             ),
-          );
-        },
+          ),
+          // Liste des utilisateurs
+          Expanded(
+            child: Consumer<UserController>(
+              builder: (context, controller, child) {
+                if (controller.isLoading) {
+                  return const Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        CircularProgressIndicator(),
+                        SizedBox(height: 16),
+                        Text('Chargement des utilisateurs...'),
+                      ],
+                    ),
+                  );
+                }
+                
+                if (controller.error != null) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.error_outline, size: 64, color: Colors.red),
+                        const SizedBox(height: 16),
+                        Text(controller.error!, style: const TextStyle(color: Colors.red)),
+                        const SizedBox(height: 16),
+                        ElevatedButton(
+                          onPressed: controller.loadAllUsers,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF003366),
+                          ),
+                          child: const Text('Réessayer'),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+                
+                // Mettre à jour la liste filtrée
+                if (_filteredUsers.isEmpty && _searchController.text.isNotEmpty) {
+                  return const Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.search_off, size: 64, color: Colors.grey),
+                        SizedBox(height: 16),
+                        Text('Aucun utilisateur trouvé', style: TextStyle(color: Colors.grey)),
+                      ],
+                    ),
+                  );
+                }
+                
+                final usersToShow = _filteredUsers.isEmpty && _searchController.text.isEmpty
+                    ? controller.users
+                    : _filteredUsers;
+                
+                if (usersToShow.isEmpty) {
+                  return const Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.people, size: 64, color: Colors.grey),
+                        SizedBox(height: 16),
+                        Text('Aucun utilisateur', style: TextStyle(color: Colors.grey)),
+                        SizedBox(height: 8),
+                        Text('Appuyez sur + pour ajouter', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                      ],
+                    ),
+                  );
+                }
+                
+                return RefreshIndicator(
+                  onRefresh: controller.loadAllUsers,
+                  color: const Color(0xFF003366),
+                  child: ListView.builder(
+                    padding: const EdgeInsets.all(12),
+                    itemCount: usersToShow.length,
+                    itemBuilder: (context, index) => _buildUserCard(usersToShow[index], controller),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
       ),
     );
+  }
+  
+  // 👈 FILTRER LES UTILISATEURS PAR NOM OU PRÉNOM (CONTAINS)
+  void _filterUsers() {
+    final query = _searchController.text.trim().toLowerCase();
+    final controller = Provider.of<UserController>(context, listen: false);
+    
+    if (query.isEmpty) {
+      setState(() {
+        _filteredUsers = [];
+      });
+      return;
+    }
+    
+    setState(() {
+      _filteredUsers = controller.users.where((user) {
+        final nom = user.nom.toLowerCase();
+        final prenom = user.prenom.toLowerCase();
+        return nom.contains(query) || prenom.contains(query);
+      }).toList();
+    });
   }
   
   Widget _buildUserCard(UserModel user, UserController controller) {
@@ -333,7 +414,6 @@ class _GestionUtilisateursPageState extends State<GestionUtilisateursPage> {
     );
   }
   
-  // 👈 CORRECTION DU DROPDOWN
   void _showEditDialog(BuildContext context, UserModel user) {
     final nomCtrl = TextEditingController(text: user.nom);
     final prenomCtrl = TextEditingController(text: user.prenom);
@@ -341,7 +421,6 @@ class _GestionUtilisateursPageState extends State<GestionUtilisateursPage> {
     String role = user.role;
     bool isLoading = false;
     
-    // Liste des rôles
     final List<DropdownMenuItem<String>> roleItems = const [
       DropdownMenuItem(value: 'user', child: Text('Usager')),
       DropdownMenuItem(value: 'admin', child: Text('Administrateur')),
@@ -384,7 +463,6 @@ class _GestionUtilisateursPageState extends State<GestionUtilisateursPage> {
                     keyboardType: TextInputType.emailAddress,
                   ),
                   const SizedBox(height: 12),
-                  // 👈 DROPDOWN CORRIGÉ
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8),
                     decoration: BoxDecoration(

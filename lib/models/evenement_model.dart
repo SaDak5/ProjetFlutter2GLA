@@ -16,6 +16,7 @@ class EvenementModel {
   final bool estGratuit;
   final bool estAnnule;
   final DateTime dateCreation;
+  final Map<String, int> reservations; // 👈 userId -> nombre de places réservées
   
   File? localImage;
   
@@ -34,10 +35,20 @@ class EvenementModel {
     this.estGratuit = false,
     this.estAnnule = false,
     required this.dateCreation,
+    this.reservations = const {},
     this.localImage,
   });
   
   factory EvenementModel.fromMap(Map<String, dynamic> data, String id) {
+    // Récupérer les réservations
+    Map<String, int> reservationsMap = {};
+    final reservationsData = data['reservations'];
+    if (reservationsData != null && reservationsData is Map) {
+      reservationsData.forEach((key, value) {
+        reservationsMap[key.toString()] = (value as num).toInt();
+      });
+    }
+    
     return EvenementModel(
       id: id,
       titre: data['titre'] ?? '',
@@ -53,6 +64,7 @@ class EvenementModel {
       estGratuit: data['estGratuit'] ?? false,
       estAnnule: data['estAnnule'] ?? false,
       dateCreation: (data['dateCreation'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      reservations: reservationsMap,
     );
   }
   
@@ -71,6 +83,7 @@ class EvenementModel {
       'estGratuit': estGratuit,
       'estAnnule': estAnnule,
       'dateCreation': Timestamp.fromDate(dateCreation),
+      'reservations': reservations,
     };
   }
   
@@ -89,6 +102,7 @@ class EvenementModel {
     bool? estGratuit,
     bool? estAnnule,
     DateTime? dateCreation,
+    Map<String, int>? reservations,
     File? localImage,
   }) {
     return EvenementModel(
@@ -106,6 +120,7 @@ class EvenementModel {
       estGratuit: estGratuit ?? this.estGratuit,
       estAnnule: estAnnule ?? this.estAnnule,
       dateCreation: dateCreation ?? this.dateCreation,
+      reservations: reservations ?? this.reservations,
       localImage: localImage ?? this.localImage,
     );
   }
@@ -113,6 +128,21 @@ class EvenementModel {
   int get placesDisponibles => nombrePlaces - placesReservees;
   bool get estComplet => placesDisponibles <= 0;
   bool get estPasse => date.isBefore(DateTime.now());
+  
+  // Vérifier si un utilisateur a réservé
+  bool aReserve(String userId) {
+    return reservations.containsKey(userId);
+  }
+  
+  // Obtenir le nombre de places réservées par un utilisateur
+  int getPlacesReserveesByUser(String userId) {
+    return reservations[userId] ?? 0;
+  }
+  
+  // Obtenir la liste des IDs des participants
+  List<String> get participantsIds {
+    return reservations.keys.toList();
+  }
   
   String get statut {
     if (estAnnule) return 'Annulé';

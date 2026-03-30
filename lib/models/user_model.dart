@@ -7,6 +7,8 @@ class UserModel {
   final String email;
   final String role;
   final DateTime? createdAt;
+  final int limiteEmprunts;
+  final int nbEmpruntsActifs;
 
   UserModel({
     required this.uid,
@@ -15,6 +17,8 @@ class UserModel {
     required this.email,
     required this.role,
     this.createdAt,
+    this.limiteEmprunts = 5,
+    this.nbEmpruntsActifs = 0,
   });
 
   // Convertir UserModel en Map pour Firestore
@@ -24,7 +28,11 @@ class UserModel {
       'prenom': prenom,
       'email': email,
       'role': role,
-      'createdAt': FieldValue.serverTimestamp(),
+      'createdAt': createdAt != null 
+          ? Timestamp.fromDate(createdAt!) 
+          : FieldValue.serverTimestamp(),
+      'limiteEmprunts': limiteEmprunts,
+      'nbEmpruntsActifs': nbEmpruntsActifs,
     };
   }
 
@@ -37,14 +45,16 @@ class UserModel {
       email: data['email'] ?? '',
       role: data['role'] ?? 'usager',
       createdAt: (data['createdAt'] as Timestamp?)?.toDate(),
+      limiteEmprunts: (data['limiteEmprunts'] ?? 5).toInt(),
+      nbEmpruntsActifs: (data['nbEmpruntsActifs'] ?? 0).toInt(),
     );
   }
 
   // Pour afficher dans les logs
   @override
   String toString() {
-    return 'UserModel(uid: $uid, nom: $nom, prenom: $prenom, email: $email, role: $role)';
+    return 'UserModel(uid: $uid, nom: $nom, prenom: $prenom, email: $email, role: $role, limite: $limiteEmprunts, emprunts: $nbEmpruntsActifs)';
   }
 
-   bool get isAdmin => role == 'admin';
+  bool get isAdmin => role == 'admin';
 }

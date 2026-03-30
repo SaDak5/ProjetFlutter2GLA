@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:libcity/models/user_model.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 import '../controllers/evenement_controller.dart';
@@ -39,6 +40,8 @@ class _EvenementsPageState extends State<EvenementsPage> {
   @override
   Widget build(BuildContext context) {
     final isAdmin = Provider.of<UserController>(context).isAdmin;
+    final user = Provider.of<UserController>(context).currentUser;
+    final userId = user?.uid;
     
     return Scaffold(
       appBar: AppBar(
@@ -89,22 +92,32 @@ class _EvenementsPageState extends State<EvenementsPage> {
           Expanded(
             child: Consumer<EvenementController>(
               builder: (context, controller, child) {
-                if (controller.enChargement) {
-                  return const Center(child: CircularProgressIndicator());
-                }
+                if (controller.enChargement) return const Center(child: CircularProgressIndicator());
                 
+                // Filtrer par type
                 final items = controller.evenements
                     .where((e) => _selectedType == 'Tous' || e.type == _selectedType)
                     .toList();
                     
-                if (items.isEmpty) {
-                  return const Center(child: Text('Aucun événement'));
-                }
+                if (items.isEmpty) return const Center(child: Text('Aucun événement'));
+                
+                // Séparer les événements en deux listes
+                final maintenant = DateTime.now();
+                final eventsAvenir = items.where((e) => e.date.isAfter(maintenant) || e.date.isAtSameMomentAs(maintenant)).toList();
+                final eventsPasses = items.where((e) => e.date.isBefore(maintenant)).toList();
+                
+                // Trier les événements à venir par date croissante (du plus proche au plus loin)
+                eventsAvenir.sort((a, b) => a.date.compareTo(b.date));
+                // Trier les événements passés par date décroissante (du plus récent au plus ancien)
+                eventsPasses.sort((a, b) => b.date.compareTo(a.date));
+                
+                // Fusionner les listes (à venir d'abord, puis passés)
+                final eventsOrdonnes = [...eventsAvenir, ...eventsPasses];
                 
                 return ListView.builder(
                   padding: const EdgeInsets.all(12),
-                  itemCount: items.length,
-                  itemBuilder: (_, i) => _buildCard(items[i], isAdmin),
+                  itemCount: eventsOrdonnes.length,
+                  itemBuilder: (_, i) => _buildCard(eventsOrdonnes[i], isAdmin, userId, user),
                 );
               },
             ),
@@ -114,138 +127,345 @@ class _EvenementsPageState extends State<EvenementsPage> {
     );
   }
 
-  Widget _buildCard(EvenementModel e, bool isAdmin) {
-    // Utiliser les propriétés du modèle
-    final bool estPasse = e.estPasse;
-    final bool estComplet = e.estComplet;
-    final bool aDesReservations = e.placesReservees > 0;
+  Widget _buildCard(EvenementModel e, bool isAdmin, String? userId, UserModel? user) {
+    final maintenant = DateTime.now();
+    final estPasse = e.date.isBefore(maintenant);
+    final estComplet = e.estComplet;
+    final aReserve = e.aReserve(userId ?? '');
+    final placesReservees = e.getPlacesReserveesByUser(userId ?? '');
     
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          ClipRRect(
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-            child: e.imageBase64.isNotEmpty
-                ? Image.memory(base64Decode(e.imageBase64), height: 150, width: double.infinity, fit: BoxFit.cover)
-                : Container(height: 150, color: Colors.grey[200], child: const Icon(Icons.event, size: 50)),
+    return InkWell(
+      onTap: () => _showDetails(e, isAdmin),
+      child: Card(
+        margin: const EdgeInsets.only(bottom: 12),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Image
+            ClipRRect(
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+              child: e.imageBase64.isNotEmpty
+                  ? Image.memory(
+                      base64Decode(e.imageBase64),
+                      height: 150,
+                      width: double.infinity,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => Container(
+                        height: 150,
+                        color: Colors.grey[200],
+                        child: const Icon(Icons.broken_image, size: 50),
+                      ),
+                    )
+                  : Container(
+                      height: 150,
+                      color: Colors.grey[200],
+                      child: const Icon(Icons.event, size: 50),
+                    ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Badges
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF800020).withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(e.type, style: const TextStyle(fontSize: 11, color: Color(0xFF800020))),
+                      ),
+                      const SizedBox(width: 8),
+                      if (estPasse)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.grey,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: const Text('Expiré', style: TextStyle(fontSize: 11, color: Colors.white)),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    e.titre,
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF003366)),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  Row(children: [
+                    const Icon(Icons.calendar_today, size: 14),
+                    const SizedBox(width: 4),
+                    Expanded(child: Text(_formatDate(e.date))),
+                  ]),
+                  const SizedBox(height: 4),
+                  Row(children: [
+                    const Icon(Icons.location_on, size: 14),
+                    const SizedBox(width: 4),
+                    Expanded(child: Text(e.lieu, maxLines: 1, overflow: TextOverflow.ellipsis)),
+                  ]),
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        e.estGratuit ? 'Gratuit' : '${e.prix} DT',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: e.estGratuit ? Colors.green : const Color(0xFF800020),
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: estComplet ? Colors.red : const Color(0xFF003366),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          estComplet ? 'Complet' : '${e.placesDisponibles} places',
+                          style: const TextStyle(fontSize: 12, color: Colors.white),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      // Bouton Réserver (uniquement si non passé)
+                      if (!estPasse && !estComplet && !aReserve)
+                        ElevatedButton(
+                          onPressed: () => _reserver(e, userId, user),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.white,
+                            foregroundColor: const Color(0xFF800020),
+                            side: const BorderSide(color: Color(0xFF800020)),
+                          ),
+                          child: const Text('Réserver'),
+                        )
+                      else if (!estPasse && aReserve)
+                        ElevatedButton(
+                          onPressed: () => _gestionReservation(e, userId, user),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.white,
+                            foregroundColor: const Color(0xFF800020),
+                            side: const BorderSide(color: Color(0xFF800020)),
+                          ),
+                          child: Text(placesReservees > 0 ? 'Modifier ($placesReservees)' : 'Annuler'),
+                        )
+                      else if (estPasse)
+                        const Text('Expiré', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                      
+                      // Boutons admin
+                      if (isAdmin)
+                        Row(
+                          children: [
+                            IconButton(
+                              onPressed: () => _editDialog(e),
+                              icon: const Icon(Icons.edit, size: 18, color: Color(0xFF003366)),
+                            ),
+                            IconButton(
+                              onPressed: () => _supprimer(e.id),
+                              icon: const Icon(Icons.delete, size: 18, color: Color(0xFF800020)),
+                            ),
+                          ],
+                        ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showDetails(EvenementModel e, bool isAdmin) async {
+    final controller = Provider.of<EvenementController>(context, listen: false);
+    await controller.chargerParticipants(e.id);
+    
+    final maintenant = DateTime.now();
+    final estPasse = e.date.isBefore(maintenant);
+    
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        child: Container(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.8,
+            maxWidth: 400,
           ),
-          Padding(
-            padding: const EdgeInsets.all(12),
+          child: Column(
+            children: [
+              // Header
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: const BoxDecoration(
+                  color: Color(0xFF003366),
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.event, color: Colors.white),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        e.titre,
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    if (estPasse)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.grey,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: const Text('Expiré', style: TextStyle(fontSize: 12, color: Colors.white)),
+                      ),
+                    IconButton(
+                      onPressed: () => Navigator.pop(context),
+                      icon: const Icon(Icons.close, color: Colors.white),
+                    ),
+                  ],
+                ),
+              ),
+              // Content
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (e.imageBase64.isNotEmpty)
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: Image.memory(
+                            base64Decode(e.imageBase64),
+                            height: 200,
+                            width: double.infinity,
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                      const SizedBox(height: 16),
+                      _detailRow(Icons.calendar_today, 'Date', _formatDate(e.date)),
+                      _detailRow(Icons.location_on, 'Lieu', e.lieu),
+                      if (e.description.isNotEmpty)
+                        _detailRow(Icons.description, 'Description', e.description),
+                      _detailRow(Icons.people, 'Places', '${e.placesDisponibles}/${e.nombrePlaces} disponibles'),
+                      _detailRow(Icons.attach_money, 'Prix', e.estGratuit ? 'Gratuit' : '${e.prix} DT'),
+                      const SizedBox(height: 16),
+                      
+                      // Participants (uniquement si non passé)
+                      if (!estPasse && e.reservations.isNotEmpty) ...[
+                        const Text(
+                          'Participants',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF003366),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Consumer<EvenementController>(
+                          builder: (context, controller, child) {
+                            if (controller.participantsDetails.isEmpty) {
+                              return const Padding(
+                                padding: EdgeInsets.all(16),
+                                child: Center(child: CircularProgressIndicator()),
+                              );
+                            }
+                            
+                            return ListView.builder(
+                              shrinkWrap: true,
+                              physics: const NeverScrollableScrollPhysics(),
+                              itemCount: controller.participantsDetails.length,
+                              itemBuilder: (_, i) {
+                                final p = controller.participantsDetails[i];
+                                return ListTile(
+                                  leading: CircleAvatar(
+                                    backgroundColor: const Color(0xFF003366),
+                                    child: Text(
+                                      p['prenom']?.isNotEmpty == true
+                                          ? p['prenom'][0].toUpperCase()
+                                          : (p['nom']?.isNotEmpty == true ? p['nom'][0].toUpperCase() : '?'),
+                                      style: const TextStyle(color: Colors.white),
+                                    ),
+                                  ),
+                                  title: Text(
+                                    p['prenom'] != null && p['prenom'].isNotEmpty
+                                        ? '${p['prenom']} ${p['nom']}'.trim()
+                                        : p['nom'] ?? 'Utilisateur inconnu',
+                                  ),
+                                  subtitle: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      if (p['email'] != null && p['email'].isNotEmpty)
+                                        Text(p['email'], style: const TextStyle(fontSize: 12)),
+                                      Text(
+                                        '${p['nbPlaces']} place(s) réservée(s)',
+                                        style: const TextStyle(fontSize: 11, color: Colors.grey),
+                                      ),
+                                    ],
+                                  ),
+                                  dense: true,
+                                );
+                              },
+                            );
+                          },
+                        ),
+                      ] else if (!estPasse)
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.grey[100],
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Center(
+                            child: Text(
+                              'Aucun participant pour le moment',
+                              style: TextStyle(color: Colors.grey),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _detailRow(IconData icon, String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: const Color(0xFF003366)),
+          const SizedBox(width: 12),
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF800020).withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(e.type, style: const TextStyle(fontSize: 11, color: Color(0xFF800020))),
-                ),
-                const SizedBox(height: 8),
-                Text(e.titre, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF003366))),
-                const SizedBox(height: 4),
-                Row(children: [
-                  const Icon(Icons.calendar_today, size: 14),
-                  const SizedBox(width: 4),
-                  Text(_formatDate(e.date)),
-                ]),
-                const SizedBox(height: 4),
-                Row(children: [
-                  const Icon(Icons.location_on, size: 14),
-                  const SizedBox(width: 4),
-                  Text(e.lieu, maxLines: 1),
-                ]),
-                const SizedBox(height: 8),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      e.estGratuit ? 'Gratuit' : '${e.prix} DT',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: e.estGratuit ? Colors.green : const Color(0xFF800020),
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: estComplet ? Colors.red : const Color(0xFF003366),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        estComplet ? 'Complet' : '${e.placesDisponibles} places',
-                        style: const TextStyle(fontSize: 12, color: Colors.white),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    // Bouton Réserver - visible seulement si non complet et non passé
-                    if (!estComplet && !estPasse)
-                      ElevatedButton(
-                        onPressed: () => _reserver(e),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.white,
-                          foregroundColor: const Color(0xFF800020),
-                          side: const BorderSide(color: Color(0xFF800020)),
-                        ),
-                        child: const Text('Réserver'),
-                      )
-                    // Bouton Annuler - visible seulement si des places réservées et non passé
-                    else if (aDesReservations && !estPasse)
-                      ElevatedButton(
-                        onPressed: () => _annuler(e),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.white,
-                          foregroundColor: const Color(0xFF800020),
-                          side: const BorderSide(color: Color(0xFF800020)),
-                        ),
-                        child: const Text('Annuler'),
-                      )
-                    // Message pour événement complet
-                    else if (estComplet)
-                      const Text(
-                        'Complet',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.red,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      )
-                    // Message pour événement passé
-                    else if (estPasse)
-                      const Text(
-                        'Passé',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey,
-                        ),
-                      ),
-                    
-                    // Boutons admin (Modifier/Supprimer)
-                    if (isAdmin)
-                      Row(
-                        children: [
-                          TextButton(
-                            onPressed: () => _editDialog(e),
-                            child: const Icon(Icons.edit, size: 18, color: Color(0xFF003366)),
-                          ),
-                          TextButton(
-                            onPressed: () => _supprimer(e.id),
-                            child: const Icon(Icons.delete, size: 18, color: Color(0xFF800020)),
-                          ),
-                        ],
-                      ),
-                  ],
-                ),
+                Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                Text(value, style: const TextStyle(fontSize: 14)),
               ],
             ),
           ),
@@ -254,7 +474,88 @@ class _EvenementsPageState extends State<EvenementsPage> {
     );
   }
 
-  void _reserver(EvenementModel e) async {
+  void _gestionReservation(EvenementModel e, String? userId, UserModel? user) async {
+    if (userId == null || user == null) return;
+    
+    final places = e.getPlacesReserveesByUser(userId);
+    final choix = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Gérer - ${e.titre}'),
+        content: Text('Vous avez $places place(s) réservée(s)'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, 'annuler'), child: const Text('Annuler des places')),
+          TextButton(onPressed: () => Navigator.pop(ctx, 'ajouter'), child: const Text('Ajouter des places')),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Fermer')),
+        ],
+      ),
+    );
+    
+    if (choix == 'annuler') _annuler(e, userId);
+    else if (choix == 'ajouter') _ajouterPlaces(e, userId, user);
+  }
+
+  void _ajouterPlaces(EvenementModel e, String userId, UserModel user) async {
+    int nb = 1;
+    await showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setState) => AlertDialog(
+          title: Text('Ajouter des places - ${e.titre}'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('Places disponibles: ${e.placesDisponibles}'),
+              const SizedBox(height: 16),
+              Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                IconButton(
+                  onPressed: () => nb > 1 ? setState(() => nb--) : null,
+                  icon: const Icon(Icons.remove_circle, size: 32),
+                  color: const Color(0xFF800020),
+                ),
+                Container(
+                  width: 50,
+                  alignment: Alignment.center,
+                  child: Text('$nb', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+                ),
+                IconButton(
+                  onPressed: () => nb < e.placesDisponibles ? setState(() => nb++) : null,
+                  icon: const Icon(Icons.add_circle, size: 32),
+                  color: const Color(0xFF003366),
+                ),
+              ]),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Annuler')),
+            ElevatedButton(
+              onPressed: () async {
+                final success = await Provider.of<EvenementController>(ctx, listen: false)
+                    .reserverPlaces(e.id, nb, userId);
+                if (success && ctx.mounted) {
+                  Navigator.pop(ctx);
+                  ScaffoldMessenger.of(ctx).showSnackBar(
+                    SnackBar(content: Text('$nb place(s) ajoutée(s) avec succès'), backgroundColor: Colors.green),
+                  );
+                }
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF003366)),
+              child: const Text('Ajouter'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _reserver(EvenementModel e, String? userId, UserModel? user) async {
+    if (userId == null || user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Connectez-vous pour réserver'), backgroundColor: Colors.orange),
+      );
+      return;
+    }
+    
     int nb = 1;
     await showDialog(
       context: context,
@@ -272,7 +573,11 @@ class _EvenementsPageState extends State<EvenementsPage> {
                   icon: const Icon(Icons.remove_circle, size: 32),
                   color: const Color(0xFF800020),
                 ),
-                Text('$nb', style: const TextStyle(fontSize: 24)),
+                Container(
+                  width: 50,
+                  alignment: Alignment.center,
+                  child: Text('$nb', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+                ),
                 IconButton(
                   onPressed: () => nb < e.placesDisponibles ? setState(() => nb++) : null,
                   icon: const Icon(Icons.add_circle, size: 32),
@@ -280,7 +585,24 @@ class _EvenementsPageState extends State<EvenementsPage> {
                 ),
               ]),
               if (!e.estGratuit)
-                Text('Total: ${(e.prix * nb).toStringAsFixed(2)} DT', style: const TextStyle(fontWeight: FontWeight.bold)),
+                Container(
+                  margin: const EdgeInsets.only(top: 12),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF800020).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Total:', style: TextStyle(fontSize: 14)),
+                      Text(
+                        '${(e.prix * nb).toStringAsFixed(2)} DT',
+                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF800020)),
+                      ),
+                    ],
+                  ),
+                ),
             ],
           ),
           actions: [
@@ -288,11 +610,15 @@ class _EvenementsPageState extends State<EvenementsPage> {
             ElevatedButton(
               onPressed: () async {
                 final success = await Provider.of<EvenementController>(ctx, listen: false)
-                    .reserverPlaces(e.id, nb);
+                    .reserverPlaces(e.id, nb, userId);
                 if (success && ctx.mounted) {
                   Navigator.pop(ctx);
+                  ScaffoldMessenger.of(ctx).showSnackBar(
+                    SnackBar(content: Text('$nb place(s) réservée(s) avec succès'), backgroundColor: Colors.green),
+                  );
                 }
               },
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF003366)),
               child: const Text('Confirmer'),
             ),
           ],
@@ -301,8 +627,11 @@ class _EvenementsPageState extends State<EvenementsPage> {
     );
   }
 
-  void _annuler(EvenementModel e) async {
+  void _annuler(EvenementModel e, String? userId) async {
+    if (userId == null) return;
+    final places = e.getPlacesReserveesByUser(userId);
     int nb = 1;
+    
     await showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
@@ -311,7 +640,7 @@ class _EvenementsPageState extends State<EvenementsPage> {
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text('Places réservées: ${e.placesReservees}'),
+              Text('Vous avez $places place(s) réservée(s)'),
               const SizedBox(height: 16),
               Row(mainAxisAlignment: MainAxisAlignment.center, children: [
                 IconButton(
@@ -319,15 +648,30 @@ class _EvenementsPageState extends State<EvenementsPage> {
                   icon: const Icon(Icons.remove_circle, size: 32),
                   color: const Color(0xFF800020),
                 ),
-                Text('$nb', style: const TextStyle(fontSize: 24)),
+                Container(
+                  width: 50,
+                  alignment: Alignment.center,
+                  child: Text('$nb', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+                ),
                 IconButton(
-                  onPressed: () => nb < e.placesReservees ? setState(() => nb++) : null,
+                  onPressed: () => nb < places ? setState(() => nb++) : null,
                   icon: const Icon(Icons.add_circle, size: 32),
                   color: const Color(0xFF003366),
                 ),
               ]),
-              const SizedBox(height: 8),
-              const Text('Ces places redeviendront disponibles', style: TextStyle(fontSize: 12, color: Colors.grey)),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.orange.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Text(
+                  'Ces places redeviendront disponibles',
+                  style: TextStyle(fontSize: 12, color: Colors.orange),
+                  textAlign: TextAlign.center,
+                ),
+              ),
             ],
           ),
           actions: [
@@ -335,9 +679,12 @@ class _EvenementsPageState extends State<EvenementsPage> {
             ElevatedButton(
               onPressed: () async {
                 final success = await Provider.of<EvenementController>(ctx, listen: false)
-                    .annulerReservation(e.id, nb);
+                    .annulerReservation(e.id, nb, userId);
                 if (success && ctx.mounted) {
                   Navigator.pop(ctx);
+                  ScaffoldMessenger.of(ctx).showSnackBar(
+                    SnackBar(content: Text('$nb place(s) annulée(s)'), backgroundColor: Colors.orange),
+                  );
                 }
               },
               style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF800020)),
@@ -365,42 +712,56 @@ class _EvenementsPageState extends State<EvenementsPage> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setState) => AlertDialog(
-          title: const Text('Ajouter'),
+          title: const Text('Ajouter un événement'),
           content: SizedBox(
             width: 320,
             child: SingleChildScrollView(
               child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   GestureDetector(
                     onTap: () async {
-                      final p = await _picker.pickImage(
-                        source: ImageSource.gallery,
-                        maxWidth: 800,
-                        maxHeight: 800,
-                        imageQuality: 80,
-                      );
+                      final p = await _picker.pickImage(source: ImageSource.gallery);
                       if (p != null) setState(() => img = File(p.path));
                     },
                     child: Container(
                       height: 120,
                       width: double.infinity,
-                      color: Colors.grey[200],
-                      child: img != null ? Image.file(img!, fit: BoxFit.cover) : const Icon(Icons.add_photo_alternate),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[200],
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: img != null 
+                          ? ClipRRect(
+                              borderRadius: BorderRadius.circular(8),
+                              child: Image.file(img!, fit: BoxFit.cover),
+                            )
+                          : Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.add_photo_alternate, size: 40, color: Colors.grey[600]),
+                                const SizedBox(height: 8),
+                                Text('Ajouter une image', style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+                              ],
+                            ),
                     ),
                   ),
                   const SizedBox(height: 12),
-                  TextField(controller: titre, decoration: const InputDecoration(labelText: 'Titre')),
-                  TextField(controller: desc, decoration: const InputDecoration(labelText: 'Description'), maxLines: 2),
+                  TextField(controller: titre, decoration: const InputDecoration(labelText: 'Titre *', border: OutlineInputBorder())),
+                  const SizedBox(height: 12),
+                  TextField(controller: desc, decoration: const InputDecoration(labelText: 'Description', border: OutlineInputBorder()), maxLines: 2),
+                  const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
                     value: type,
-                    decoration: const InputDecoration(labelText: 'Type'),
+                    decoration: const InputDecoration(labelText: 'Type *', border: OutlineInputBorder()),
                     items: _types.where((t) => t != 'Tous').map((t) => DropdownMenuItem(value: t, child: Text(t))).toList(),
                     onChanged: (v) => setState(() => type = v!),
                   ),
+                  const SizedBox(height: 12),
                   ListTile(
-                    title: const Text('Date'),
+                    title: const Text('Date et heure'),
                     subtitle: Text(_formatDate(date)),
-                    trailing: const Icon(Icons.calendar_today),
+                    trailing: const Icon(Icons.calendar_today, color: Color(0xFF003366)),
                     onTap: () async {
                       final d = await showDatePicker(
                         context: ctx,
@@ -419,13 +780,43 @@ class _EvenementsPageState extends State<EvenementsPage> {
                       }
                     },
                   ),
-                  TextField(controller: lieu, decoration: const InputDecoration(labelText: 'Lieu')),
-                  TextField(controller: adresse, decoration: const InputDecoration(labelText: 'Adresse')),
-                  TextField(controller: places, decoration: const InputDecoration(labelText: 'Places'), keyboardType: TextInputType.number),
+                  const SizedBox(height: 12),
+                  TextField(controller: lieu, decoration: const InputDecoration(labelText: 'Lieu *', border: OutlineInputBorder())),
+                  const SizedBox(height: 12),
+                  TextField(controller: adresse, decoration: const InputDecoration(labelText: 'Adresse', border: OutlineInputBorder())),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: places,
+                    decoration: const InputDecoration(labelText: 'Nombre de places *', border: OutlineInputBorder()),
+                    keyboardType: TextInputType.number,
+                  ),
+                  const SizedBox(height: 12),
                   Row(
                     children: [
-                      Expanded(child: TextField(controller: prix, decoration: const InputDecoration(labelText: 'Prix'), keyboardType: TextInputType.number)),
-                      Row(children: [const Text('Gratuit'), Switch(value: gratuit, onChanged: (v) => setState(() => gratuit = v))]),
+                      Expanded(
+                        child: TextField(
+                          controller: prix,
+                          decoration: const InputDecoration(labelText: 'Prix', border: OutlineInputBorder(), prefixText: 'DT '),
+                          keyboardType: TextInputType.number,
+                          enabled: !gratuit,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Row(
+                        children: [
+                          const Text('Gratuit'),
+                          Switch(
+                            value: gratuit,
+                            onChanged: (v) {
+                              setState(() {
+                                gratuit = v;
+                                if (v) prix.text = '0';
+                              });
+                            },
+                            activeColor: const Color(0xFF003366),
+                          ),
+                        ],
+                      ),
                     ],
                   ),
                 ],
@@ -436,19 +827,38 @@ class _EvenementsPageState extends State<EvenementsPage> {
             TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Annuler')),
             ElevatedButton(
               onPressed: () async {
+                if (titre.text.isEmpty) {
+                  ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('Veuillez saisir un titre')));
+                  return;
+                }
+                if (lieu.text.isEmpty) {
+                  ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('Veuillez saisir un lieu')));
+                  return;
+                }
+                final nbrPlaces = int.tryParse(places.text);
+                if (nbrPlaces == null || nbrPlaces <= 0) {
+                  ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('Nombre de places invalide')));
+                  return;
+                }
+                
                 final ok = await Provider.of<EvenementController>(ctx, listen: false).ajouterEvenement(
                   titre: titre.text,
                   description: desc.text,
                   date: date,
                   lieu: lieu.text,
                   adresse: adresse.text,
-                  nombrePlaces: int.tryParse(places.text) ?? 0,
+                  nombrePlaces: nbrPlaces,
                   prix: gratuit ? 0 : double.tryParse(prix.text) ?? 0,
                   type: type,
                   image: img,
                   estGratuit: gratuit,
                 );
-                if (ok && ctx.mounted) Navigator.pop(ctx);
+                if (ok && ctx.mounted) {
+                  Navigator.pop(ctx);
+                  ScaffoldMessenger.of(ctx).showSnackBar(
+                    const SnackBar(content: Text('Événement ajouté avec succès'), backgroundColor: Colors.green),
+                  );
+                }
               },
               child: const Text('Ajouter'),
             ),
@@ -474,46 +884,61 @@ class _EvenementsPageState extends State<EvenementsPage> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setState) => AlertDialog(
-          title: const Text('Modifier'),
+          title: const Text('Modifier l\'événement'),
           content: SizedBox(
             width: 320,
             child: SingleChildScrollView(
               child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   GestureDetector(
                     onTap: () async {
-                      final p = await _picker.pickImage(
-                        source: ImageSource.gallery,
-                        maxWidth: 800,
-                        maxHeight: 800,
-                        imageQuality: 80,
-                      );
+                      final p = await _picker.pickImage(source: ImageSource.gallery);
                       if (p != null) setState(() => newImg = File(p.path));
                     },
                     child: Container(
                       height: 120,
                       width: double.infinity,
-                      color: Colors.grey[200],
+                      decoration: BoxDecoration(
+                        color: Colors.grey[200],
+                        borderRadius: BorderRadius.circular(8),
+                      ),
                       child: newImg != null 
-                        ? Image.file(newImg!, fit: BoxFit.cover) 
-                        : (e.imageBase64.isNotEmpty 
-                          ? Image.memory(base64Decode(e.imageBase64), fit: BoxFit.cover) 
-                          : const Icon(Icons.image)),
+                          ? ClipRRect(
+                              borderRadius: BorderRadius.circular(8),
+                              child: Image.file(newImg!, fit: BoxFit.cover),
+                            )
+                          : (e.imageBase64.isNotEmpty 
+                              ? ClipRRect(
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: Image.memory(base64Decode(e.imageBase64), fit: BoxFit.cover),
+                                )
+                              : Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(Icons.image, size: 40, color: Colors.grey[600]),
+                                    const SizedBox(height: 8),
+                                    Text('Changer l\'image', style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+                                  ],
+                                )),
                     ),
                   ),
                   const SizedBox(height: 12),
-                  TextField(controller: titre, decoration: const InputDecoration(labelText: 'Titre')),
-                  TextField(controller: desc, decoration: const InputDecoration(labelText: 'Description'), maxLines: 2),
+                  TextField(controller: titre, decoration: const InputDecoration(labelText: 'Titre *', border: OutlineInputBorder())),
+                  const SizedBox(height: 12),
+                  TextField(controller: desc, decoration: const InputDecoration(labelText: 'Description', border: OutlineInputBorder()), maxLines: 2),
+                  const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
                     value: type,
-                    decoration: const InputDecoration(labelText: 'Type'),
+                    decoration: const InputDecoration(labelText: 'Type *', border: OutlineInputBorder()),
                     items: _types.where((t) => t != 'Tous').map((t) => DropdownMenuItem(value: t, child: Text(t))).toList(),
                     onChanged: (v) => setState(() => type = v!),
                   ),
+                  const SizedBox(height: 12),
                   ListTile(
-                    title: const Text('Date'),
+                    title: const Text('Date et heure'),
                     subtitle: Text(_formatDate(date)),
-                    trailing: const Icon(Icons.calendar_today),
+                    trailing: const Icon(Icons.calendar_today, color: Color(0xFF003366)),
                     onTap: () async {
                       final d = await showDatePicker(
                         context: ctx,
@@ -532,13 +957,43 @@ class _EvenementsPageState extends State<EvenementsPage> {
                       }
                     },
                   ),
-                  TextField(controller: lieu, decoration: const InputDecoration(labelText: 'Lieu')),
-                  TextField(controller: adresse, decoration: const InputDecoration(labelText: 'Adresse')),
-                  TextField(controller: places, decoration: const InputDecoration(labelText: 'Places'), keyboardType: TextInputType.number),
+                  const SizedBox(height: 12),
+                  TextField(controller: lieu, decoration: const InputDecoration(labelText: 'Lieu *', border: OutlineInputBorder())),
+                  const SizedBox(height: 12),
+                  TextField(controller: adresse, decoration: const InputDecoration(labelText: 'Adresse', border: OutlineInputBorder())),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: places,
+                    decoration: const InputDecoration(labelText: 'Nombre de places *', border: OutlineInputBorder()),
+                    keyboardType: TextInputType.number,
+                  ),
+                  const SizedBox(height: 12),
                   Row(
                     children: [
-                      Expanded(child: TextField(controller: prix, decoration: const InputDecoration(labelText: 'Prix'), keyboardType: TextInputType.number)),
-                      Row(children: [const Text('Gratuit'), Switch(value: gratuit, onChanged: (v) => setState(() => gratuit = v))]),
+                      Expanded(
+                        child: TextField(
+                          controller: prix,
+                          decoration: const InputDecoration(labelText: 'Prix', border: OutlineInputBorder(), prefixText: 'DT '),
+                          keyboardType: TextInputType.number,
+                          enabled: !gratuit,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Row(
+                        children: [
+                          const Text('Gratuit'),
+                          Switch(
+                            value: gratuit,
+                            onChanged: (v) {
+                              setState(() {
+                                gratuit = v;
+                                if (v) prix.text = '0';
+                              });
+                            },
+                            activeColor: const Color(0xFF003366),
+                          ),
+                        ],
+                      ),
                     ],
                   ),
                 ],
@@ -549,6 +1004,20 @@ class _EvenementsPageState extends State<EvenementsPage> {
             TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Annuler')),
             ElevatedButton(
               onPressed: () async {
+                if (titre.text.isEmpty) {
+                  ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('Veuillez saisir un titre')));
+                  return;
+                }
+                if (lieu.text.isEmpty) {
+                  ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('Veuillez saisir un lieu')));
+                  return;
+                }
+                final nbrPlaces = int.tryParse(places.text);
+                if (nbrPlaces == null || nbrPlaces <= 0) {
+                  ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('Nombre de places invalide')));
+                  return;
+                }
+                
                 String base64 = e.imageBase64;
                 if (newImg != null) {
                   final bytes = await newImg!.readAsBytes();
@@ -560,7 +1029,7 @@ class _EvenementsPageState extends State<EvenementsPage> {
                   date: date,
                   lieu: lieu.text,
                   adresse: adresse.text,
-                  nombrePlaces: int.tryParse(places.text) ?? e.nombrePlaces,
+                  nombrePlaces: nbrPlaces,
                   prix: gratuit ? 0 : double.tryParse(prix.text) ?? e.prix,
                   type: type,
                   estGratuit: gratuit,
@@ -568,7 +1037,12 @@ class _EvenementsPageState extends State<EvenementsPage> {
                 );
                 final success = await Provider.of<EvenementController>(ctx, listen: false)
                     .modifierEvenement(updated);
-                if (success && ctx.mounted) Navigator.pop(ctx);
+                if (success && ctx.mounted) {
+                  Navigator.pop(ctx);
+                  ScaffoldMessenger.of(ctx).showSnackBar(
+                    const SnackBar(content: Text('Événement modifié avec succès'), backgroundColor: Colors.green),
+                  );
+                }
               },
               child: const Text('Enregistrer'),
             ),
@@ -583,7 +1057,7 @@ class _EvenementsPageState extends State<EvenementsPage> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Supprimer'),
-        content: const Text('Confirmer ?'),
+        content: const Text('Confirmer la suppression de cet événement ?'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Non')),
           TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Oui')),
@@ -595,7 +1069,7 @@ class _EvenementsPageState extends State<EvenementsPage> {
           .supprimerEvenement(id);
       if (success && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Événement supprimé')),
+          const SnackBar(content: Text('Événement supprimé'), backgroundColor: Colors.green),
         );
       }
     }
@@ -610,5 +1084,5 @@ class _EvenementsPageState extends State<EvenementsPage> {
     }
   }
 
-  String _formatDate(DateTime d) => '${d.day}/${d.month}/${d.year} à ${d.hour}h${d.minute.toString().padLeft(2, '0')}';
+  String _formatDate(DateTime d) => '${d.day}/${d.month}/${d.year} ${d.hour}h${d.minute.toString().padLeft(2, '0')}';
 }

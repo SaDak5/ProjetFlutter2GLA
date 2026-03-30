@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:libcity/controllers/emprunt_controller.dart';
-import 'package:libcity/controllers/reservation_controller.dart';
+import 'package:libcity/views/dashboard.dart';
 import 'package:libcity/views/emprunts.dart';
 import 'package:libcity/views/gestion_utilisateurs.dart';
+import 'package:libcity/views/historique.dart';
 import 'package:libcity/views/home_page.dart';
-import 'package:libcity/views/reservations.dart';
 import 'package:provider/provider.dart';
 import 'views/login.dart';
 import 'views/signup.dart';
@@ -79,7 +79,7 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => EvenementController()),
         ChangeNotifierProvider(create: (_) => UserController()),
         ChangeNotifierProvider(create: (_) => EmpruntController()),
-        ChangeNotifierProvider(create: (_) => ReservationController()),
+    
       ],
       child: MaterialApp(
         title: 'Mediacité',
@@ -97,8 +97,9 @@ class MyApp extends StatelessWidget {
           '/evenements': (context) => const EvenementsPage(),
           '/main_page': (context) => const MainPage(),
           '/emprunts': (context) => const EmpruntsPage(),
-          '/reservations': (context) => const ReservationsPage(),
           '/gestion_utilisateurs': (context) => const GestionUtilisateursPage(),
+          '/dashboard': (context) => const DashboardPage(),
+          '/historique': (context) => const HistoriquePage(),
         },
       ),
     );

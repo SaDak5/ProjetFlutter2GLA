@@ -1,23 +1,51 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 import '../models/emprunt_model.dart';
-import '../models/reservation_model.dart';
 import '../services/emprunt_service.dart';
 
 class EmpruntController extends ChangeNotifier {
   final EmpruntService _service = EmpruntService();
-  
+
   List<EmpruntModel> _mesEmprunts = [];
-  List<ReservationModel> _mesReservations = [];
+  List<EmpruntModel> _tousLesEmprunts = [];
+
   bool _isLoading = false;
   String? _error;
-  
+
+  // Getters
   List<EmpruntModel> get mesEmprunts => _mesEmprunts;
-  List<ReservationModel> get mesReservations => _mesReservations;
+  List<EmpruntModel> get tousLesEmprunts => _tousLesEmprunts;
+
   bool get isLoading => _isLoading;
   String? get error => _error;
-  
-  Future<void> chargerMesEmprunts(String userId) async {
+
+  // =========================
+  // MES EMPRUNTS (USER)
+  // =========================
+  void chargerMesEmprunts(String userId) {
+    if (userId.isEmpty) return;
+
     _setLoading(true);
+
+    _service.streamMesEmprunts(userId).listen(
+      (emprunts) {
+        _mesEmprunts = emprunts;
+        _error = null;
+        _setLoading(false);
+      },
+      onError: (error) {
+        _error = error.toString();
+        _setLoading(false);
+      },
+    );
+  }
+
+  Future<void> rechargerMesEmprunts(String userId) async {
+    if (userId.isEmpty) return;
+
+    _setLoading(true);
+
     try {
       _mesEmprunts = await _service.streamMesEmprunts(userId).first;
       _error = null;
@@ -27,98 +55,90 @@ class EmpruntController extends ChangeNotifier {
       _setLoading(false);
     }
   }
-  
-  Future<bool> emprunter(String userId, String catalogueId, int nbExemplaires) async {
-    _setLoading(true);
-    try {
-      await _service.emprunter(userId, catalogueId, nbExemplaires);
-      await chargerMesEmprunts(userId);
-      return true;
-    } catch (e) {
-      _error = e.toString();
-      return false;
-    } finally {
-      _setLoading(false);
-    }
-  }
-  
-  Future<bool> retourner(String empruntId, String catalogueId) async {
-    _setLoading(true);
-    try {
-      await _service.retourner(empruntId, catalogueId);
-      return true;
-    } catch (e) {
-      _error = e.toString();
-      return false;
-    } finally {
-      _setLoading(false);
-    }
-  }
-  
-  Future<bool> prolonger(String empruntId) async {
-    _setLoading(true);
-    try {
-      await _service.prolonger(empruntId);
-      return true;
-    } catch (e) {
-      _error = e.toString();
-      return false;
-    } finally {
-      _setLoading(false);
-    }
-  }
-  
-  Future<bool> reserver(String userId, String catalogueId) async {
-    _setLoading(true);
-    try {
-      await _service.reserver(userId, catalogueId);
-      await chargerMesReservations(userId);
-      return true;
-    } catch (e) {
-      _error = e.toString();
-      return false;
-    } finally {
-      _setLoading(false);
-    }
-  }
-  
- // Dans emprunt_controller.dart
-// Remplacer la méthode annulerReservation par celle-ci :
 
-Future<bool> annulerReservation(String reservationId, String catalogueId) async {
+  // =========================
+  // TOUS LES EMPRUNTS (GLOBAL)
+  // =========================
+  // =========================
+// TOUS LES EMPRUNTS (GLOBAL)
+// =========================
+void chargerTousLesEmprunts() {
   _setLoading(true);
-  try {
-    await _service.annulerReservation(reservationId, catalogueId);
-    // Recharger les réservations
-    if (_mesReservations.isNotEmpty) {
-      await chargerMesReservations(_mesReservations.first.userId);
-    }
-    return true;
-  } catch (e) {
-    _error = e.toString();
-    return false;
-  } finally {
-    _setLoading(false);
-  }
-}
-  
-  Future<void> chargerMesReservations(String userId) async {
-    _setLoading(true);
-    try {
-      _mesReservations = await _service.streamMesReservations(userId).first;
+
+  // Utilisation du stream pour avoir les mises à jour en temps réel (ex: quand un retour est fait)
+  _service.streamTousLesEmprunts().listen(
+    (emprunts) {
+      _tousLesEmprunts = emprunts;
       _error = null;
+      _isLoading = false; // On passe par la variable pour éviter un notifyListeners en boucle ici
+      notifyListeners();
+    },
+    onError: (error) {
+      _error = error.toString();
+      _setLoading(false);
+    },
+  );
+}
+
+  // =========================
+  // EMPRUNTER
+  // =========================
+  Future<bool> emprunterAvecDate(
+      String userId,
+      String catalogueId,
+      int nbExemplaires,
+      DateTime dateRetour) async {
+    _setLoading(true);
+
+    try {
+      await _service.emprunterAvecDate(
+          userId, catalogueId, nbExemplaires, dateRetour);
+
+      _error = null;
+      notifyListeners();
+      return true;
     } catch (e) {
       _error = e.toString();
+      notifyListeners();
+      return false;
     } finally {
       _setLoading(false);
     }
   }
-  
+
+  // =========================
+  // RETOURNER
+  // =========================
+  Future<bool> retourner(
+      String empruntId,
+      String catalogueId,
+      int nbExemplairesARendre) async {
+    _setLoading(true);
+
+    try {
+      await _service.retourner(
+          empruntId, catalogueId, nbExemplairesARendre);
+
+      _error = null;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+      return false;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  // =========================
+  // UTIL
+  // =========================
   void _setLoading(bool loading) {
     _isLoading = loading;
     notifyListeners();
   }
-  
+
   void clearError() {
     _error = null;
     notifyListeners();

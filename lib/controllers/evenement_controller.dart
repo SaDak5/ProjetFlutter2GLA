@@ -10,10 +10,12 @@ class EvenementController extends ChangeNotifier {
   List<EvenementModel> _evenements = [];
   bool _chargement = false;
   String? _erreur;
+  List<Map<String, dynamic>> _participantsDetails = [];
   
   List<EvenementModel> get evenements => _evenements;
   bool get enChargement => _chargement;
   String? get erreur => _erreur;
+  List<Map<String, dynamic>> get participantsDetails => _participantsDetails;
   Stream<List<EvenementModel>> get fluxEvenements => _service.streamEvenements();
   
   // ========== RECHERCHES ==========
@@ -74,6 +76,7 @@ class EvenementController extends ChangeNotifier {
     File? image,
     bool estGratuit = false,
   }) async {
+    _enChargement(true);
     try {
       if (titre.isEmpty) throw Exception('Titre requis');
       if (lieu.isEmpty) throw Exception('Lieu requis');
@@ -101,21 +104,27 @@ class EvenementController extends ChangeNotifier {
         type: type,
         estGratuit: estGratuit,
         dateCreation: DateTime.now(),
+        reservations: {},
       );
       
       await _service.ajouterEvenement(nouvelEvenement);
       _evenements.insert(0, nouvelEvenement);
+      _erreur = null;
       notifyListeners();
       return true;
       
     } catch (e) {
       _erreur = e.toString();
+      print('❌ Erreur ajout événement: $e');
       notifyListeners();
       return false;
+    } finally {
+      _enChargement(false);
     }
   }
   
   Future<bool> modifierEvenement(EvenementModel evenement) async {
+    _enChargement(true);
     try {
       if (evenement.titre.isEmpty) throw Exception('Titre requis');
       if (evenement.lieu.isEmpty) throw Exception('Lieu requis');
@@ -128,37 +137,51 @@ class EvenementController extends ChangeNotifier {
         _evenements[index] = evenement;
         notifyListeners();
       }
+      
+      _erreur = null;
       return true;
       
     } catch (e) {
       _erreur = e.toString();
+      print('❌ Erreur modification événement: $e');
       notifyListeners();
       return false;
+    } finally {
+      _enChargement(false);
     }
   }
   
   Future<bool> supprimerEvenement(String id) async {
+    _enChargement(true);
     try {
       await _service.supprimerEvenement(id);
       _evenements.removeWhere((e) => e.id == id);
+      _erreur = null;
       notifyListeners();
       return true;
     } catch (e) {
       _erreur = e.toString();
+      print('❌ Erreur suppression événement: $e');
       notifyListeners();
       return false;
+    } finally {
+      _enChargement(false);
     }
   }
   
   // ========== RÉSERVATIONS ==========
   
-  Future<bool> reserverPlaces(String evenementId, int nombrePlaces) async {
+  Future<bool> reserverPlaces(String evenementId, int nombrePlaces, String userId) async {
+    _enChargement(true);
     try {
       if (nombrePlaces <= 0) throw Exception('Nombre de places invalide');
+      if (userId.isEmpty) throw Exception('Utilisateur non identifié');
       
-      await _service.reserverPlaces(evenementId, nombrePlaces);
+      print('🔨 Réservation: evenementId=$evenementId, nbPlaces=$nombrePlaces, userId=$userId');
       
-      // 🔄 Mettre à jour l'événement dans la liste locale
+      await _service.reserverPlaces(evenementId, nombrePlaces, userId);
+      
+      // Mettre à jour l'événement dans la liste locale
       final updated = await _service.getEvenementById(evenementId);
       if (updated != null) {
         final index = _evenements.indexWhere((e) => e.id == evenementId);
@@ -168,40 +191,63 @@ class EvenementController extends ChangeNotifier {
         }
       }
       
+      _erreur = null;
       return true;
     } catch (e) {
       _erreur = e.toString();
+      print('❌ Erreur reservation: $e');
       notifyListeners();
       return false;
+    } finally {
+      _enChargement(false);
     }
   }
   
-  // ========== ANNULATION ==========
-
-Future<bool> annulerReservation(String evenementId, int nombrePlaces) async {
-  try {
-    if (nombrePlaces <= 0) throw Exception('Nombre de places invalide');
-    
-    // Appel au service pour annuler
-    await _service.annulerReservation(evenementId, nombrePlaces);
-    
-    // Mettre à jour l'événement dans la liste locale
-    final updated = await _service.getEvenementById(evenementId);
-    if (updated != null) {
-      final index = _evenements.indexWhere((e) => e.id == evenementId);
-      if (index != -1) {
-        _evenements[index] = updated;
-        notifyListeners();  // Met à jour l'UI
+  Future<bool> annulerReservation(String evenementId, int nombrePlaces, String userId) async {
+    _enChargement(true);
+    try {
+      if (nombrePlaces <= 0) throw Exception('Nombre de places invalide');
+      if (userId.isEmpty) throw Exception('Utilisateur non identifié');
+      
+      print('🔨 Annulation: evenementId=$evenementId, nbPlaces=$nombrePlaces, userId=$userId');
+      
+      await _service.annulerReservation(evenementId, nombrePlaces, userId);
+      
+      // Mettre à jour l'événement dans la liste locale
+      final updated = await _service.getEvenementById(evenementId);
+      if (updated != null) {
+        final index = _evenements.indexWhere((e) => e.id == evenementId);
+        if (index != -1) {
+          _evenements[index] = updated;
+          notifyListeners();
+        }
       }
+      
+      _erreur = null;
+      return true;
+    } catch (e) {
+      _erreur = e.toString();
+      print('❌ Erreur annulation: $e');
+      notifyListeners();
+      return false;
+    } finally {
+      _enChargement(false);
     }
-    
-    return true;
-  } catch (e) {
-    _erreur = e.toString();
-    notifyListeners();
-    return false;
   }
-}
+  
+  // ========== RÉCUPÉRATION DES PARTICIPANTS ==========
+  
+  Future<void> chargerParticipants(String evenementId) async {
+    try {
+      _participantsDetails = await _service.getParticipantsAvecDetails(evenementId);
+      print('✅ ${_participantsDetails.length} participants chargés');
+      notifyListeners();
+    } catch (e) {
+      print('❌ Erreur chargement participants: $e');
+      _participantsDetails = [];
+      notifyListeners();
+    }
+  }
   
   // ========== UTILITAIRES ==========
   
@@ -213,5 +259,27 @@ Future<bool> annulerReservation(String evenementId, int nombrePlaces) async {
   void effacerErreur() {
     _erreur = null;
     notifyListeners();
+  }
+  
+  void reinitialiserParticipants() {
+    _participantsDetails = [];
+    notifyListeners();
+  }
+  
+  // Méthodes pour la vue
+  bool utilisateurAReserve(String evenementId, String userId) {
+    final evenement = _evenements.firstWhere((e) => e.id == evenementId, orElse: () => EvenementModel(
+      id: '', titre: '', description: '', imageBase64: '', date: DateTime.now(),
+      lieu: '', adresse: '', nombrePlaces: 0, prix: 0, type: '', dateCreation: DateTime.now(),
+    ));
+    return evenement.aReserve(userId);
+  }
+  
+  int getPlacesReserveesUtilisateur(String evenementId, String userId) {
+    final evenement = _evenements.firstWhere((e) => e.id == evenementId, orElse: () => EvenementModel(
+      id: '', titre: '', description: '', imageBase64: '', date: DateTime.now(),
+      lieu: '', adresse: '', nombrePlaces: 0, prix: 0, type: '', dateCreation: DateTime.now(),
+    ));
+    return evenement.getPlacesReserveesByUser(userId);
   }
 }

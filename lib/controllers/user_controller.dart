@@ -16,6 +16,8 @@ class UserController extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get error => _error;
   bool get isAdmin => _currentUser?.role == 'admin';
+  int get limiteEmprunts => _currentUser?.limiteEmprunts ?? 5;
+  int get nbEmpruntsActifs => _currentUser?.nbEmpruntsActifs ?? 0;
   
   Future<void> loadCurrentUser() async {
     _isLoading = true;
@@ -25,79 +27,93 @@ class UserController extends ChangeNotifier {
     notifyListeners();
   }
   
-  // 👈 Version corrigée avec plus de logs
+  // 👈 UTILISER getAllUsers
   Future<void> loadAllUsers() async {
     _isLoading = true;
     notifyListeners();
     try {
-      print('🔍 Chargement des utilisateurs...');
-      _users = await _service.getAllUsers();
-      print('✅ ${_users.length} utilisateurs chargés');
+      _users = await _service.getAllUsers();  // ✅ Maintenant disponible
       _error = null;
     } catch (e) {
       _error = e.toString();
-      print('❌ Erreur loadAllUsers: $e');
     } finally {
       _isLoading = false;
       notifyListeners();
     }
   }
   
-  // 👈 Charger uniquement les usagers
   Future<void> loadUsagers() async {
     _isLoading = true;
     notifyListeners();
     try {
-      print('🔍 Chargement des usagers...');
       _users = await _service.getUsagers();
-      print('✅ ${_users.length} usagers chargés');
       _error = null;
     } catch (e) {
       _error = e.toString();
-      print('❌ Erreur loadUsagers: $e');
     } finally {
       _isLoading = false;
       notifyListeners();
     }
   }
   
-  Future<bool> addUser({
-    required String email,
-    required String nom,
-    required String prenom,
-    required String password,
-  }) async {
-    _isLoading = true;
-    notifyListeners();
+  Future<int> countUsers() async {
     try {
-      print('➕ Création utilisateur: $email');
-      final userCredential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
-      
-      final newUser = UserModel(
-        uid: userCredential.user!.uid,
-        nom: nom,
-        prenom: prenom,
-        email: email,
-        role: 'user',
-        createdAt: DateTime.now(),
-      );
-      
-      await _service.createUser(newUser);
-      await loadAllUsers();
-      print('✅ Utilisateur créé avec succès');
-      return true;
+      return await _service.countUsers();
     } catch (e) {
-      _error = e.toString();
-      print('❌ Erreur addUser: $e');
-      return false;
-    } finally {
-      _isLoading = false;
-      notifyListeners();
+      return 0;
     }
   }
+  
+  Future<void> initialiserUtilisateur() async {
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+    final email = FirebaseAuth.instance.currentUser?.email;
+    if (userId == null || email == null) return;
+    
+    await _service.creerUtilisateurSiExistePas(
+      uid: userId,
+      email: email,
+      role: 'usager',
+      limiteEmprunts: 5,
+    );
+    await loadCurrentUser();
+  }
+  
+ Future<bool> addUser({
+  required String email,
+  required String nom,
+  required String prenom,
+  required String password,
+}) async {
+  _isLoading = true;
+  notifyListeners();
+  try {
+    final userCredential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
+      email: email,
+      password: password,
+    );
+    
+    final newUser = UserModel(
+      uid: userCredential.user!.uid,
+      nom: nom,
+      prenom: prenom,
+      email: email,
+      role: 'usager',
+      createdAt: DateTime.now(),
+      limiteEmprunts: 5,     
+      nbEmpruntsActifs: 0,  
+    );
+    
+    await _service.createUser(newUser);
+    await loadAllUsers();
+    return true;
+  } catch (e) {
+    _error = e.toString();
+    return false;
+  } finally {
+    _isLoading = false;
+    notifyListeners();
+  }
+}
   
   Future<bool> updateUser(UserModel user) async {
     _isLoading = true;
