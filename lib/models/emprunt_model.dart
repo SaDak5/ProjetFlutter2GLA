@@ -9,9 +9,12 @@ class EmpruntModel {
   final String imageBase64;
   final DateTime dateEmprunt;
   final DateTime dateRetourPrevu;
-  final DateTime? dateRetourEffective; // Optionnel : pour savoir quand il a été rendu
+  final DateTime? dateRetourEffective;
   final int nbExemplaires;
-  final String statut; // 'actif' ou 'retourne'
+  final String statut;
+  final String userNom;
+  final String userPrenom;
+  final String userEmail;
 
   EmpruntModel({
     required this.id,
@@ -24,37 +27,62 @@ class EmpruntModel {
     required this.dateRetourPrevu,
     this.dateRetourEffective,
     this.nbExemplaires = 1,
-    this.statut = 'actif', // Par défaut à la création
+    this.statut = 'actif',
+    this.userNom = '',
+    this.userPrenom = '',
+    this.userEmail = '',
   });
 
   factory EmpruntModel.fromMap(Map<String, dynamic> data, String id) {
     return EmpruntModel(
       id: id,
-      userId: data['userId'] ?? '',
-      catalogueId: data['catalogueId'] ?? '',
-      titre: data['titre'] ?? '',
-      auteur: data['auteur'] ?? '',
-      imageBase64: data['imageBase64'] ?? '',
-      dateEmprunt: (data['dateEmprunt'] as Timestamp?)?.toDate() ?? DateTime.now(),
-      dateRetourPrevu: (data['dateRetourPrevu'] as Timestamp?)?.toDate() ?? DateTime.now(),
-      dateRetourEffective: (data['dateRetourEffective'] as Timestamp?)?.toDate(),
-      nbExemplaires: (data['nbExemplaires'] ?? 1).toInt(),
-      statut: data['statut'] ?? 'actif',
+      userId:        _str(data['userId']),
+      catalogueId:   _str(data['catalogueId']),
+      titre:         _str(data['titre']),
+      auteur:        _str(data['auteur']),
+      imageBase64:   _str(data['imageBase64']),
+      dateEmprunt:        _date(data['dateEmprunt'])        ?? DateTime.now(),
+      dateRetourPrevu:    _date(data['dateRetourPrevu'])    ?? DateTime.now(),
+      dateRetourEffective: _date(data['dateRetourEffective']),
+      nbExemplaires: (data['nbExemplaires'] as num?)?.toInt() ?? 1,
+      statut:        _str(data['statut'], fallback: 'actif'),
+      userNom:       _str(data['userNom']),
+      userPrenom:    _str(data['userPrenom']),
+      userEmail:     _str(data['userEmail']),
     );
+  }
+
+  // ✅ Cast null-safe : n'importe quel type → String propre
+  static String _str(dynamic v, {String fallback = ''}) {
+    if (v == null) return fallback;
+    return v.toString();
+  }
+
+  // ✅ Cast null-safe pour Timestamp → DateTime
+  static DateTime? _date(dynamic v) {
+    if (v == null) return null;
+    if (v is Timestamp) return v.toDate();
+    if (v is DateTime) return v;
+    return null;
   }
 
   Map<String, dynamic> toMap() {
     return {
-      'userId': userId,
-      'catalogueId': catalogueId,
-      'titre': titre,
-      'auteur': auteur,
-      'imageBase64': imageBase64,
-      'dateEmprunt': Timestamp.fromDate(dateEmprunt),
-      'dateRetourPrevu': Timestamp.fromDate(dateRetourPrevu),
-      'dateRetourEffective': dateRetourEffective != null ? Timestamp.fromDate(dateRetourEffective!) : null,
+      'userId':       userId,
+      'catalogueId':  catalogueId,
+      'titre':        titre,
+      'auteur':       auteur,
+      'imageBase64':  imageBase64,
+      'dateEmprunt':        Timestamp.fromDate(dateEmprunt),
+      'dateRetourPrevu':    Timestamp.fromDate(dateRetourPrevu),
+      'dateRetourEffective': dateRetourEffective != null
+          ? Timestamp.fromDate(dateRetourEffective!)
+          : null,
       'nbExemplaires': nbExemplaires,
-      'statut': statut,
+      'statut':        statut,
+      'userNom':       userNom,
+      'userPrenom':    userPrenom,
+      'userEmail':     userEmail,
     };
   }
 }

@@ -124,3 +124,4 @@ class CatalogueService {
     return (data['nbExemplairesDisponibles'] ?? 0).toInt();
   }
 }
+//

@@ -6,7 +6,6 @@ class UserService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final String _collectionName = 'users';
 
-  // 👈 AJOUTER CETTE MÉTHODE
   // Récupérer TOUS les utilisateurs (sans filtre)
   Future<List<UserModel>> getAllUsers() async {
     try {
@@ -53,6 +52,20 @@ class UserService {
     return null;
   }
   
+  // 👈 NOUVELLE MÉTHODE : Récupérer un utilisateur par son ID
+  Future<UserModel?> getUserById(String uid) async {
+    try {
+      final doc = await _firestore.collection(_collectionName).doc(uid).get();
+      if (doc.exists) {
+        return UserModel.fromFirestore(doc.id, doc.data() as Map<String, dynamic>);
+      }
+      return null;
+    } catch (e) {
+      print('❌ Erreur getUserById: $e');
+      return null;
+    }
+  }
+  
   // Vérifier si l'utilisateur est admin
   Future<bool> isCurrentUserAdmin() async {
     final user = await getCurrentUser();
@@ -60,33 +73,32 @@ class UserService {
   }
   
   // Créer un utilisateur
-Future<void> createUser(UserModel user) async {
-  await _firestore.collection(_collectionName).doc(user.uid).set(user.toFirestore());
-}
+  Future<void> createUser(UserModel user) async {
+    await _firestore.collection(_collectionName).doc(user.uid).set(user.toFirestore());
+  }
   
   // Créer un utilisateur si n'existe pas
-  // Créer un utilisateur si n'existe pas
-Future<void> creerUtilisateurSiExistePas({
-  required String uid,
-  required String email,
-  String nom = '',
-  String prenom = '',
-  String role = 'usager',
-  int limiteEmprunts = 5,
-}) async {
-  final doc = await _firestore.collection(_collectionName).doc(uid).get();
-  if (!doc.exists) {
-    await _firestore.collection(_collectionName).doc(uid).set({
-      'nom': nom,
-      'prenom': prenom,
-      'email': email,
-      'role': role,
-      'limiteEmprunts': limiteEmprunts,
-      'nbEmpruntsActifs': 0,
-      'createdAt': FieldValue.serverTimestamp(),
-    });
+  Future<void> creerUtilisateurSiExistePas({
+    required String uid,
+    required String email,
+    String nom = '',
+    String prenom = '',
+    String role = 'usager',
+    int limiteEmprunts = 5,
+  }) async {
+    final doc = await _firestore.collection(_collectionName).doc(uid).get();
+    if (!doc.exists) {
+      await _firestore.collection(_collectionName).doc(uid).set({
+        'nom': nom,
+        'prenom': prenom,
+        'email': email,
+        'role': role,
+        'limiteEmprunts': limiteEmprunts,
+        'nbEmpruntsActifs': 0,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+    }
   }
-}
   
   // Mettre à jour un utilisateur
   Future<void> updateUser(UserModel user) async {
@@ -121,4 +133,3 @@ Future<void> creerUtilisateurSiExistePas({
     });
   }
 }
-

@@ -51,13 +51,8 @@ class EmpruntService {
       final userDoc = await transaction.get(userRef);
       final catalogueDoc = await transaction.get(catalogueRef);
 
-      if (!userDoc.exists) {
-        throw Exception('Utilisateur introuvable');
-      }
-
-      if (!catalogueDoc.exists) {
-        throw Exception('Catalogue introuvable');
-      }
+      if (!userDoc.exists) throw Exception('Utilisateur introuvable');
+      if (!catalogueDoc.exists) throw Exception('Catalogue introuvable');
 
       final userData = userDoc.data()!;
       final catalogueData = catalogueDoc.data()!;
@@ -74,22 +69,22 @@ class EmpruntService {
         throw Exception('Stock insuffisant');
       }
 
-      final empruntRef =
-          _firestore.collection(_empruntsCollection).doc();
+      final empruntRef = _firestore.collection(_empruntsCollection).doc();
 
       final emprunt = EmpruntModel(
         id: empruntRef.id,
         userId: userId,
         catalogueId: catalogueId,
-
-        // ⚠️ ces champs doivent exister dans ton model
         titre: catalogueData['nom'] ?? '',
         auteur: catalogueData['auteur'] ?? '',
         imageBase64: catalogueData['imageBase64'] ?? '',
-
         dateEmprunt: DateTime.now(),
         dateRetourPrevu: dateRetour,
         nbExemplaires: nbExemplaires,
+        // ✅ Snapshot des infos user au moment de l'emprunt
+        userNom: userData['nom'] ?? '',
+        userPrenom: userData['prenom'] ?? '',
+        userEmail: userData['email'] ?? '',
       );
 
       transaction.set(empruntRef, {
@@ -110,55 +105,50 @@ class EmpruntService {
   // =========================
   // 🔹 RETOUR
   // =========================
-  // =========================
-// 🔹 RETOUR (Mis à jour)
-// =========================
-Future<void> retourner(
-  String empruntId,
-  String catalogueId,
-  int nbExemplairesARendre,
-) async {
-  final empruntRef = _firestore.collection(_empruntsCollection).doc(empruntId);
-  final catalogueRef = _firestore.collection(_cataloguesCollection).doc(catalogueId);
+  Future<void> retourner(
+    String empruntId,
+    String catalogueId,
+    int nbExemplairesARendre,
+  ) async {
+    final empruntRef =
+        _firestore.collection(_empruntsCollection).doc(empruntId);
+    final catalogueRef =
+        _firestore.collection(_cataloguesCollection).doc(catalogueId);
 
-  await _firestore.runTransaction((transaction) async {
-    final empruntDoc = await transaction.get(empruntRef);
-    final catalogueDoc = await transaction.get(catalogueRef);
+    await _firestore.runTransaction((transaction) async {
+      final empruntDoc = await transaction.get(empruntRef);
+      final catalogueDoc = await transaction.get(catalogueRef);
 
-    if (!empruntDoc.exists) throw Exception('Emprunt introuvable');
-    if (!catalogueDoc.exists) throw Exception('Catalogue introuvable');
+      if (!empruntDoc.exists) throw Exception('Emprunt introuvable');
+      if (!catalogueDoc.exists) throw Exception('Catalogue introuvable');
 
-    final empruntData = empruntDoc.data()!;
-    final userId = empruntData['userId'];
-    
-    // On récupère le nombre d'exemplaires que l'utilisateur possède actuellement pour cet emprunt
-    final int nbPossedes = (empruntData['nbExemplaires'] ?? 0).toInt();
-    if (nbPossedes <= 0) throw Exception('Cet emprunt est déjà totalement retourné');
+      final empruntData = empruntDoc.data()!;
+      final userId = empruntData['userId'];
 
-    // Sécurité : on ne peut pas rendre plus que ce qu'on a
-    final int nbEffectifARendre = nbExemplairesARendre > nbPossedes 
-        ? nbPossedes 
-        : nbExemplairesARendre;
+      final int nbPossedes = (empruntData['nbExemplaires'] ?? 0).toInt();
+      if (nbPossedes <= 0) {
+        throw Exception('Cet emprunt est déjà totalement retourné');
+      }
 
-    final int resteAPosseder = nbPossedes - nbEffectifARendre;
+      final int nbEffectifARendre =
+          nbExemplairesARendre > nbPossedes ? nbPossedes : nbExemplairesARendre;
+      final int resteAPosseder = nbPossedes - nbEffectifARendre;
 
-    // 1. Mise à jour de l'emprunt
-    transaction.update(empruntRef, {
-      'nbExemplaires': resteAPosseder,
-      'statut': resteAPosseder == 0 ? 'retourné' : 'partiel',
-      'dateRetourEffective': resteAPosseder == 0 ? FieldValue.serverTimestamp() : null,
+      transaction.update(empruntRef, {
+        'nbExemplaires': resteAPosseder,
+        'statut': resteAPosseder == 0 ? 'retourné' : 'partiel',
+        'dateRetourEffective':
+            resteAPosseder == 0 ? FieldValue.serverTimestamp() : null,
+      });
+
+      transaction.update(catalogueRef, {
+        'nbExemplairesDisponibles': FieldValue.increment(nbEffectifARendre),
+      });
+
+      transaction.update(
+        _firestore.collection(_usersCollection).doc(userId),
+        {'nbEmpruntsActifs': FieldValue.increment(-nbEffectifARendre)},
+      );
     });
-
-    // 2. Mise à jour du stock catalogue (On réaugmente le disponible)
-    transaction.update(catalogueRef, {
-      'nbExemplairesDisponibles': FieldValue.increment(nbEffectifARendre),
-    });
-
-    // 3. Mise à jour du compteur de l'utilisateur (On diminue les emprunts actifs)
-    transaction.update(
-      _firestore.collection(_usersCollection).doc(userId),
-      {'nbEmpruntsActifs': FieldValue.increment(-nbEffectifARendre)},
-    );
-  });
-}
+  }
 }

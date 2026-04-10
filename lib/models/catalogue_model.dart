@@ -82,3 +82,4 @@ class CatalogueModel {
     return '$nbExemplairesDisponibles exemplaires disponibles';
   }
 }
+//

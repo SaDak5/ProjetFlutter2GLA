@@ -2,11 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:libcity/controllers/emprunt_controller.dart';
+import 'package:libcity/controllers/message_controller.dart';
+import 'package:libcity/controllers/notification_controller.dart';
 import 'package:libcity/views/dashboard.dart';
 import 'package:libcity/views/emprunts.dart';
 import 'package:libcity/views/gestion_utilisateurs.dart';
 import 'package:libcity/views/historique.dart';
 import 'package:libcity/views/home_page.dart';
+import 'package:libcity/views/messagerie.dart';
 import 'package:provider/provider.dart';
 import 'views/login.dart';
 import 'views/signup.dart';
@@ -79,6 +82,8 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => EvenementController()),
         ChangeNotifierProvider(create: (_) => UserController()),
         ChangeNotifierProvider(create: (_) => EmpruntController()),
+        ChangeNotifierProvider(create: (_) => NotificationController()), 
+        ChangeNotifierProvider(create: (_) => MessageController()), 
     
       ],
       child: MaterialApp(
@@ -100,6 +105,7 @@ class MyApp extends StatelessWidget {
           '/gestion_utilisateurs': (context) => const GestionUtilisateursPage(),
           '/dashboard': (context) => const DashboardPage(),
           '/historique': (context) => const HistoriquePage(),
+          '/messagerie': (context) => const MessageriePage(),
         },
       ),
     );
