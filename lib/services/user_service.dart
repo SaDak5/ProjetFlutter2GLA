@@ -120,7 +120,7 @@ class UserService {
     return snapshot.count ?? 0;
   }
   
-  // Mettre à jour les emprunts qui sont actif
+  // Mettre à jour les emprunts qui sont actifs
   Future<void> incrementerEmpruntsActifs(String userId, int nombre) async {
     await _firestore.collection(_collectionName).doc(userId).update({
       'nbEmpruntsActifs': FieldValue.increment(nombre),
