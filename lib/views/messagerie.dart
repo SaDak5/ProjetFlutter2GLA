@@ -127,7 +127,7 @@ class _MessageriePageState extends State<MessageriePage> {
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withOpacity(0.05),
-                  blurRadius: 4,
+                  blurRadius: 5,
                   offset: const Offset(0, -2),
                 ),
               ],

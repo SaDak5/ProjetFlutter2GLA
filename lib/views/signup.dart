@@ -16,6 +16,7 @@ class _SignupPageState extends State<SignupPage> {
   final _confirmPassword = TextEditingController();
   final _auth = AuthController();
   bool _isLoading = false;
+  bool _passwordMatch = true;
 
   static const Color bleuElegant = Color(0xFF2A4D8F);
 
@@ -51,13 +52,12 @@ class _SignupPageState extends State<SignupPage> {
     setState(() => _isLoading = false);
 
     if (user != null && mounted) {
-      _showSuccessDialog(); // ✅ tick
+      _showSuccessDialog();
     } else if (mounted) {
       _showSnackBar("Erreur lors de la création du compte", Colors.black54);
     }
   }
 
-  // ✅ DIALOG SUCCESS (TICK)
   void _showSuccessDialog() {
     showDialog(
       context: context,
@@ -103,6 +103,14 @@ class _SignupPageState extends State<SignupPage> {
     );
   }
 
+  void _updatePasswordMatch() {
+    if (_confirmPassword.text.isNotEmpty) {
+      setState(() {
+        _passwordMatch = _confirmPassword.text == _password.text;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -134,7 +142,6 @@ class _SignupPageState extends State<SignupPage> {
 
                   const SizedBox(height: 10),
 
-                  // 🖼️ Logo circulaire
                   Container(
                     width: 180,
                     height: 180,
@@ -204,15 +211,87 @@ class _SignupPageState extends State<SignupPage> {
 
                   const SizedBox(height: 16),
 
-                  _buildTextField(
-                      _password, "Mot de passe", Icons.lock_outline,
-                      obscure: true),
+                  // Champ mot de passe avec onChanged pour mettre à jour la vérification
+                  TextField(
+                    controller: _password,
+                    obscureText: true,
+                    onChanged: (_) => _updatePasswordMatch(),
+                    style: const TextStyle(color: Colors.black),
+                    decoration: InputDecoration(
+                      labelText: "Mot de passe",
+                      labelStyle: const TextStyle(color: Colors.black87),
+                      prefixIcon:
+                          const Icon(Icons.lock_outline, color: bleuElegant),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: Colors.black26),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide:
+                            const BorderSide(color: bleuElegant, width: 2),
+                      ),
+                      filled: true,
+                      fillColor: Colors.white,
+                    ),
+                  ),
 
                   const SizedBox(height: 16),
 
-                  _buildTextField(_confirmPassword,
-                      "Confirmer mot de passe", Icons.lock_outline,
-                      obscure: true),
+                  // Champ confirmer mot de passe avec feedback visuel
+                  TextField(
+                    controller: _confirmPassword,
+                    obscureText: true,
+                    onChanged: (value) {
+                      setState(() {
+                        _passwordMatch =
+                            value.isEmpty || value == _password.text;
+                      });
+                    },
+                    style: const TextStyle(color: Colors.black),
+                    decoration: InputDecoration(
+                      labelText: "Confirmer mot de passe",
+                      labelStyle: const TextStyle(color: Colors.black87),
+                      prefixIcon:
+                          const Icon(Icons.lock_outline, color: bleuElegant),
+                      suffixIcon: _confirmPassword.text.isEmpty
+                          ? null
+                          : Icon(
+                              _passwordMatch
+                                  ? Icons.check_circle
+                                  : Icons.cancel,
+                              color:
+                                  _passwordMatch ? Colors.green : Colors.red,
+                            ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(
+                          color: _confirmPassword.text.isEmpty
+                              ? Colors.black26
+                              : (_passwordMatch ? Colors.green : Colors.red),
+                          width: _confirmPassword.text.isEmpty ? 1 : 1.5,
+                        ),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(
+                          color: _passwordMatch ? bleuElegant : Colors.red,
+                          width: 2,
+                        ),
+                      ),
+                      helperText: _confirmPassword.text.isEmpty
+                          ? null
+                          : (_passwordMatch
+                              ? "Mots de passe identiques ✓"
+                              : "Mots de passe différents"),
+                      helperStyle: TextStyle(
+                        color: _passwordMatch ? Colors.green : Colors.red,
+                        fontSize: 12,
+                      ),
+                      filled: true,
+                      fillColor: Colors.white,
+                    ),
+                  ),
 
                   const SizedBox(height: 32),
 
@@ -233,14 +312,12 @@ class _SignupPageState extends State<SignupPage> {
                           ? const SizedBox(
                               height: 20,
                               width: 20,
-                              child:
-                                  CircularProgressIndicator(strokeWidth: 2),
+                              child: CircularProgressIndicator(strokeWidth: 2),
                             )
                           : const Text(
                               "S'inscrire",
                               style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold),
+                                  fontSize: 16, fontWeight: FontWeight.bold),
                             ),
                     ),
                   ),
