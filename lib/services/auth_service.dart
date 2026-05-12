@@ -50,7 +50,7 @@ class AuthService {
     }
   }
 
-  // LOGIN
+  // LOGin
   Future<UserModel?> signIn({
     required String email,
     required String password,
