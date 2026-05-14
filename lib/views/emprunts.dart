@@ -18,11 +18,15 @@ class _EmpruntsPageState extends State<EmpruntsPage> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final userId =
-          Provider.of<UserController>(context, listen: false).currentUser?.uid;
+      final userId = Provider.of<UserController>(
+        context,
+        listen: false,
+      ).currentUser?.uid;
       if (userId != null) {
-        Provider.of<EmpruntController>(context, listen: false)
-            .chargerMesEmprunts(userId);
+        Provider.of<EmpruntController>(
+          context,
+          listen: false,
+        ).chargerMesEmprunts(userId);
       }
     });
   }
@@ -64,8 +68,10 @@ class _EmpruntsPageState extends State<EmpruntsPage> {
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Center(
                 child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.white.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(20),
@@ -139,9 +145,12 @@ class _EmpruntsPageState extends State<EmpruntsPage> {
   }
 
   Widget _buildEmpruntCard(EmpruntModel emprunt, UserModel? currentUser) {
-    final estEnRetard = emprunt.dateRetourPrevu.isBefore(DateTime.now());
-    final joursRetard =
-        DateTime.now().difference(emprunt.dateRetourPrevu).inDays;
+    final isReturned = emprunt.nbExemplaires == 0;
+    final estEnRetard =
+        !isReturned && emprunt.dateRetourPrevu.isBefore(DateTime.now());
+    final joursRetard = DateTime.now()
+        .difference(emprunt.dateRetourPrevu)
+        .inDays;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -157,10 +166,14 @@ class _EmpruntsPageState extends State<EmpruntsPage> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
-                    color: estEnRetard
+                    color: isReturned
+                        ? Colors.green.withOpacity(0.1)
+                        : estEnRetard
                         ? Colors.red.withOpacity(0.1)
                         : const Color(0xFF003366).withOpacity(0.1),
                     borderRadius: BorderRadius.circular(4),
@@ -169,18 +182,30 @@ class _EmpruntsPageState extends State<EmpruntsPage> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(
-                        estEnRetard ? Icons.warning : Icons.check_circle,
+                        isReturned
+                            ? Icons.check
+                            : estEnRetard
+                            ? Icons.warning
+                            : Icons.check_circle,
                         size: 12,
-                        color: estEnRetard
+                        color: isReturned
+                            ? Colors.green
+                            : estEnRetard
                             ? Colors.red
                             : const Color(0xFF003366),
                       ),
                       const SizedBox(width: 4),
                       Text(
-                        estEnRetard ? 'En retard' : 'En cours',
+                        isReturned
+                            ? 'Retourné'
+                            : estEnRetard
+                            ? 'En retard'
+                            : 'En cours',
                         style: TextStyle(
                           fontSize: 10,
-                          color: estEnRetard
+                          color: isReturned
+                              ? Colors.green
+                              : estEnRetard
                               ? Colors.red
                               : const Color(0xFF003366),
                           fontWeight: FontWeight.w500,
@@ -190,8 +215,10 @@ class _EmpruntsPageState extends State<EmpruntsPage> {
                   ),
                 ),
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.grey[200],
                     borderRadius: BorderRadius.circular(4),
@@ -233,8 +260,11 @@ class _EmpruntsPageState extends State<EmpruntsPage> {
                           width: 80,
                           height: 100,
                           color: Colors.grey[200],
-                          child: const Icon(Icons.book,
-                              size: 40, color: Colors.grey),
+                          child: const Icon(
+                            Icons.book,
+                            size: 40,
+                            color: Colors.grey,
+                          ),
                         ),
                 ),
                 const SizedBox(width: 12),
@@ -247,36 +277,41 @@ class _EmpruntsPageState extends State<EmpruntsPage> {
                       Text(
                         emprunt.titre,
                         style: const TextStyle(
-                            fontSize: 16, fontWeight: FontWeight.bold),
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 4),
                       Text(
                         'Auteur: ${emprunt.auteur}',
-                        style:
-                            TextStyle(fontSize: 12, color: Colors.grey[600]),
+                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 8),
                       Row(
                         children: [
-                          const Icon(Icons.calendar_today,
-                              size: 12, color: Colors.grey),
+                          const Icon(
+                            Icons.calendar_today,
+                            size: 12,
+                            color: Colors.grey,
+                          ),
                           const SizedBox(width: 4),
                           Text(
                             'Emprunté: ${_formatDate(emprunt.dateEmprunt)}',
                             style: TextStyle(
-                                fontSize: 11, color: Colors.grey[600]),
+                              fontSize: 11,
+                              color: Colors.grey[600],
+                            ),
                           ),
                         ],
                       ),
                       const SizedBox(height: 4),
                       Row(
                         children: [
-                          const Icon(Icons.event,
-                              size: 12, color: Colors.grey),
+                          const Icon(Icons.event, size: 12, color: Colors.grey),
                           const SizedBox(width: 4),
                           Text(
                             'Retour prévu: ${_formatDate(emprunt.dateRetourPrevu)}',
@@ -292,11 +327,13 @@ class _EmpruntsPageState extends State<EmpruntsPage> {
                           ),
                         ],
                       ),
-                      if (estEnRetard)
+                      if (!isReturned && estEnRetard)
                         Container(
                           margin: const EdgeInsets.only(top: 8),
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 10, vertical: 5),
+                            horizontal: 10,
+                            vertical: 5,
+                          ),
                           decoration: BoxDecoration(
                             color: Colors.red,
                             borderRadius: BorderRadius.circular(6),
@@ -304,7 +341,9 @@ class _EmpruntsPageState extends State<EmpruntsPage> {
                           child: Text(
                             '$joursRetard jour(s) de retard',
                             style: const TextStyle(
-                                color: Colors.white, fontSize: 11),
+                              color: Colors.white,
+                              fontSize: 11,
+                            ),
                           ),
                         ),
                     ],
@@ -319,7 +358,8 @@ class _EmpruntsPageState extends State<EmpruntsPage> {
               style: OutlinedButton.styleFrom(
                 side: const BorderSide(color: Color(0xFF003366)),
                 shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8)),
+                  borderRadius: BorderRadius.circular(8),
+                ),
               ),
               child: const Text(
                 'Voir plus de détails',
@@ -333,9 +373,12 @@ class _EmpruntsPageState extends State<EmpruntsPage> {
   }
 
   void _showDetailsDialog(BuildContext context, EmpruntModel emprunt) {
-    final estEnRetard = emprunt.dateRetourPrevu.isBefore(DateTime.now());
-    final joursRestants =
-        emprunt.dateRetourPrevu.difference(DateTime.now()).inDays;
+    final isReturned = emprunt.nbExemplaires == 0;
+    final estEnRetard =
+        !isReturned && emprunt.dateRetourPrevu.isBefore(DateTime.now());
+    final joursRestants = emprunt.dateRetourPrevu
+        .difference(DateTime.now())
+        .inDays;
 
     showDialog(
       context: context,
@@ -352,9 +395,11 @@ class _EmpruntsPageState extends State<EmpruntsPage> {
             ),
             const SizedBox(width: 12),
             Expanded(
-              child: Text(emprunt.titre,
-                  style: const TextStyle(fontSize: 16),
-                  overflow: TextOverflow.ellipsis),
+              child: Text(
+                emprunt.titre,
+                style: const TextStyle(fontSize: 16),
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
           ],
         ),
@@ -383,22 +428,37 @@ class _EmpruntsPageState extends State<EmpruntsPage> {
               const SizedBox(height: 16),
               _buildDetailRow(Icons.person, 'Auteur', emprunt.auteur),
               const Divider(),
-              _buildDetailRow(Icons.inventory, 'Nombre d\'exemplaires',
-                  '${emprunt.nbExemplaires}'),
+              _buildDetailRow(
+                Icons.inventory,
+                'Nombre d\'exemplaires',
+                '${emprunt.nbExemplaires}',
+              ),
               const Divider(),
-              _buildDetailRow(Icons.calendar_today, 'Date d\'emprunt',
-                  _formatDateTime(emprunt.dateEmprunt)),
+              _buildDetailRow(
+                Icons.calendar_today,
+                'Date d\'emprunt',
+                _formatDateTime(emprunt.dateEmprunt),
+              ),
               const Divider(),
-              _buildDetailRow(Icons.event, 'Date de retour prévue',
-                  _formatDateTime(emprunt.dateRetourPrevu)),
+              _buildDetailRow(
+                Icons.event,
+                'Date de retour prévue',
+                _formatDateTime(emprunt.dateRetourPrevu),
+              ),
               const Divider(),
               _buildDetailRow(
                 Icons.warning,
                 'Statut',
-                estEnRetard
+                isReturned
+                    ? 'Retourné'
+                    : estEnRetard
                     ? 'En retard de ${-joursRestants} jour(s)'
                     : 'Dans les délais ($joursRestants jour(s) restants)',
-                color: estEnRetard ? Colors.red : Colors.green,
+                color: isReturned
+                    ? Colors.green
+                    : estEnRetard
+                    ? Colors.red
+                    : Colors.green,
               ),
             ],
           ),
@@ -413,8 +473,12 @@ class _EmpruntsPageState extends State<EmpruntsPage> {
     );
   }
 
-  Widget _buildDetailRow(IconData icon, String label, String value,
-      {Color? color}) {
+  Widget _buildDetailRow(
+    IconData icon,
+    String label,
+    String value, {
+    Color? color,
+  }) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
@@ -426,19 +490,25 @@ class _EmpruntsPageState extends State<EmpruntsPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(label,
-                    style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF003366))),
+                Text(
+                  label,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF003366),
+                  ),
+                ),
                 const SizedBox(height: 2),
-                Text(value,
-                    style: TextStyle(
-                        fontSize: 14,
-                        color: color ?? Colors.black87,
-                        fontWeight: color != null
-                            ? FontWeight.bold
-                            : FontWeight.normal)),
+                Text(
+                  value,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: color ?? Colors.black87,
+                    fontWeight: color != null
+                        ? FontWeight.bold
+                        : FontWeight.normal,
+                  ),
+                ),
               ],
             ),
           ),

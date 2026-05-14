@@ -77,7 +77,8 @@ class _MessageriePageState extends State<MessageriePage> {
       appBar: AppBar(
         title: const Text(
           'Messagerie',
-          style: TextStyle(fontWeight: FontWeight.bold),
+          style: TextStyle(fontWeight: FontWeight.bold,color: Colors.white,
+          ),
         ),
         backgroundColor: const Color(0xFF003366),
         elevation: 0,

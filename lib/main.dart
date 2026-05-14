@@ -87,7 +87,7 @@ class MyApp extends StatelessWidget {
     
       ],
       child: MaterialApp(
-        title: 'Mediacité',
+        title: 'Libcity',
         debugShowCheckedModeBanner: false,
         theme: ThemeData(
           primarySwatch: Colors.deepPurple,

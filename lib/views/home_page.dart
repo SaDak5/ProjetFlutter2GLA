@@ -32,7 +32,7 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Mediacité', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+        title: const Text('Libcity', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
         backgroundColor: const Color(0xFF003366),
         actions: [
           if (_user != null)
@@ -85,7 +85,7 @@ class _HomePageState extends State<HomePage> {
                 children: [
                   const Text('Bienvenue à', style: TextStyle(color: Colors.white)),
                   const Text(
-                    'Mediacité',
+                    'Libcity',
                     style: TextStyle(
                       color: Colors.white,
                       fontSize: 28,
@@ -176,7 +176,7 @@ class _HomePageState extends State<HomePage> {
             const Card(
               child: ListTile(
                 leading: Icon(Icons.email, color: Color(0xFF003366)),
-                title: Text('contact@mediacite.fr'),
+                title: Text('contact@Libcity.fr'),
               ),
             ),
           ],

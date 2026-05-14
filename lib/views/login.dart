@@ -1,5 +1,8 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import '../controllers/auth_controller.dart';
+import '../services/google_auth_service.dart'; // À ajouter
+import '../services/user_service.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -12,11 +15,13 @@ class _LoginPageState extends State<LoginPage> {
   final _email = TextEditingController();
   final _password = TextEditingController();
   final _auth = AuthController();
+  final _googleAuth = GoogleAuthService(); // À ajouter
   bool _isLoading = false;
 
   static const Color bordeaux = Color(0xFF6D1B1B);
   static const Color bleuElegant = Color(0xFF2A4D8F);
 
+  // Connexion classique
   Future<void> _login() async {
     if (_email.text.isEmpty || _password.text.isEmpty) {
       _showSnackBar("Veuillez remplir tous les champs", Colors.red);
@@ -33,13 +38,60 @@ class _LoginPageState extends State<LoginPage> {
     setState(() => _isLoading = false);
 
     if (user != null && mounted) {
-      _showSuccessDialog(); // ✅ tick au lieu du snackbar
+      _showSuccessDialog("Connexion réussie");
     } else if (mounted) {
       _showSnackBar("Email ou mot de passe incorrect", Colors.red);
     }
   }
 
-  void _showSuccessDialog() {
+  // 🆕 Connexion avec Google
+  Future<void> _loginWithGoogle() async {
+    setState(() => _isLoading = true);
+    final userService = UserService();
+    final googleUser = await _googleAuth.selectGoogleAccount();
+
+    if (googleUser == null) {
+      setState(() => _isLoading = false);
+      if (mounted) {
+        _showSnackBar("Connexion Google annulée", Colors.orange);
+      }
+      return;
+    }
+
+    final user = await _googleAuth.signInWithGoogleAccount(googleUser);
+
+    if (user == null) {
+      setState(() => _isLoading = false);
+      if (mounted) {
+        _showSnackBar("Connexion Google impossible", Colors.red);
+      }
+      return;
+    }
+
+    final existingUser = await userService.getUserByEmail(
+      user.email ?? googleUser.email,
+    );
+
+    if (existingUser == null) {
+      await _googleAuth.signOut();
+      setState(() => _isLoading = false);
+      if (mounted) {
+        _showSnackBar(
+          "Ce compte n'est pas enregistré dans les utilisateurs",
+          Colors.red,
+        );
+      }
+      return;
+    }
+
+    setState(() => _isLoading = false);
+
+    if (mounted) {
+      _showSuccessDialog("Connexion avec Google réussie");
+    }
+  }
+
+  void _showSuccessDialog(String message) {
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -57,16 +109,16 @@ class _LoginPageState extends State<LoginPage> {
           ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
-            children: const [
-              Icon(
+            children: [
+              const Icon(
                 Icons.check_circle,
                 color: Color.fromARGB(255, 22, 97, 24),
                 size: 80,
               ),
-              SizedBox(height: 16),
+              const SizedBox(height: 16),
               Text(
-                "Connexion réussie",
-                style: TextStyle(
+                message,
+                style: const TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
                 ),
@@ -79,9 +131,9 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   void _showSnackBar(String message, Color color) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: color),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message), backgroundColor: color));
   }
 
   @override
@@ -90,10 +142,7 @@ class _LoginPageState extends State<LoginPage> {
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
-            colors: [
-              Color(0xFFF5F5F5),
-              Color(0xFFE8ECF1),
-            ],
+            colors: [Color(0xFFF5F5F5), Color(0xFFE8ECF1)],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
@@ -104,30 +153,29 @@ class _LoginPageState extends State<LoginPage> {
               padding: const EdgeInsets.all(24),
               child: Column(
                 children: [
-                  // 🔙 Retour
+                  // Retour
                   Align(
                     alignment: Alignment.topLeft,
                     child: IconButton(
                       onPressed: () =>
                           Navigator.pushReplacementNamed(context, '/'),
-                      icon: const Icon(Icons.arrow_back,
-                          color: Color.fromARGB(255, 25, 59, 132)),
+                      icon: const Icon(
+                        Icons.arrow_back,
+                        color: Color.fromARGB(255, 25, 59, 132),
+                      ),
                     ),
                   ),
 
                   const SizedBox(height: 5),
 
-                  // 🖼️ Logo circulaire
+                  // Logo
                   Container(
                     width: 240,
                     height: 240,
                     padding: const EdgeInsets.all(6),
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      border: Border.all(
-                        color: Colors.black12,
-                        width: 2,
-                      ),
+                      border: Border.all(color: Colors.black12, width: 2),
                       boxShadow: [
                         BoxShadow(
                           color: Colors.black.withOpacity(0.1),
@@ -146,12 +194,12 @@ class _LoginPageState extends State<LoginPage> {
 
                   const SizedBox(height: 36),
 
-                  // 📧 Email
+                  // Email
                   _buildTextField(_email, "Email", Icons.email_outlined),
 
                   const SizedBox(height: 16),
 
-                  // 🔒 Password
+                  // Password
                   _buildTextField(
                     _password,
                     "Mot de passe",
@@ -159,9 +207,9 @@ class _LoginPageState extends State<LoginPage> {
                     obscure: true,
                   ),
 
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 20),
 
-                  // 🔘 Bouton login
+                  // Bouton connexion classique
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
@@ -191,9 +239,53 @@ class _LoginPageState extends State<LoginPage> {
                     ),
                   ),
 
+                  const SizedBox(height: 16),
+
+                  // Séparateur
+                  Row(
+                    children: [
+                      Expanded(child: Divider(color: Colors.grey[400])),
+                      const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 16),
+                        child: Text("OU"),
+                      ),
+                      Expanded(child: Divider(color: Colors.grey[400])),
+                    ],
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // 🆕 Bouton Google
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: _isLoading ? null : _loginWithGoogle,
+                      icon: Image.asset(
+                        'assets/images/google_logo.png',
+                        height: 24,
+                        width: 24,
+                      ),
+                      label: const Text(
+                        "Continuer avec Google",
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.black87,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        side: const BorderSide(color: Colors.grey),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
+                  ),
+
                   const SizedBox(height: 24),
 
-                  // 🧾 Inscription
+                  // Inscription
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
@@ -214,7 +306,7 @@ class _LoginPageState extends State<LoginPage> {
 
                   const SizedBox(height: 10),
 
-                  // 🔙 Retour accueil
+                  // Retour accueil
                   TextButton(
                     onPressed: () =>
                         Navigator.pushReplacementNamed(context, '/'),

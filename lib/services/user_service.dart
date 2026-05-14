@@ -9,12 +9,10 @@ class UserService {
   // Récupérer TOUS les utilisateurs (sans filtre)
   Future<List<UserModel>> getAllUsers() async {
     try {
-      final snapshot = await _firestore
-          .collection(_collectionName)
-          .get();
-      
+      final snapshot = await _firestore.collection(_collectionName).get();
+
       print('📊 Nombre total d\'utilisateurs: ${snapshot.docs.length}');
-      
+
       return snapshot.docs.map((doc) {
         final data = doc.data();
         return UserModel.fromFirestore(doc.id, data);
@@ -33,9 +31,9 @@ class UserService {
           .where('role', isEqualTo: 'usager')
           .orderBy('createdAt', descending: true)
           .get();
-      return snapshot.docs.map((doc) => 
-          UserModel.fromFirestore(doc.id, doc.data())
-      ).toList();
+      return snapshot.docs
+          .map((doc) => UserModel.fromFirestore(doc.id, doc.data()))
+          .toList();
     } catch (e) {
       return [];
     }
@@ -47,17 +45,52 @@ class UserService {
     if (userId == null) return null;
     final doc = await _firestore.collection(_collectionName).doc(userId).get();
     if (doc.exists) {
-      return UserModel.fromFirestore(doc.id, doc.data() as Map<String, dynamic>);
+      return UserModel.fromFirestore(
+        doc.id,
+        doc.data() as Map<String, dynamic>,
+      );
     }
     return null;
   }
-  
+
+  // Récupérer un utilisateur par son email
+  Future<UserModel?> getUserByEmail(String email) async {
+    try {
+      final normalizedEmail = email.trim().toLowerCase();
+
+      final snapshot = await _firestore
+          .collection(_collectionName)
+          .where('email', isEqualTo: email.trim())
+          .get();
+
+      if (snapshot.docs.isNotEmpty) {
+        final doc = snapshot.docs.first;
+        return UserModel.fromFirestore(doc.id, doc.data());
+      }
+
+      final users = await getAllUsers();
+      for (final user in users) {
+        if (user.email.trim().toLowerCase() == normalizedEmail) {
+          return user;
+        }
+      }
+
+      return null;
+    } catch (e) {
+      print('❌ Erreur getUserByEmail: $e');
+      return null;
+    }
+  }
+
   // 👈 NOUVELLE MÉTHODE : Récupérer un utilisateur par son ID
   Future<UserModel?> getUserById(String uid) async {
     try {
       final doc = await _firestore.collection(_collectionName).doc(uid).get();
       if (doc.exists) {
-        return UserModel.fromFirestore(doc.id, doc.data() as Map<String, dynamic>);
+        return UserModel.fromFirestore(
+          doc.id,
+          doc.data() as Map<String, dynamic>,
+        );
       }
       return null;
     } catch (e) {
@@ -65,18 +98,21 @@ class UserService {
       return null;
     }
   }
-  
+
   // Vérifier si l'utilisateur est admin
   Future<bool> isCurrentUserAdmin() async {
     final user = await getCurrentUser();
     return user?.role == 'admin';
   }
-  
+
   // Créer un utilisateur
   Future<void> createUser(UserModel user) async {
-    await _firestore.collection(_collectionName).doc(user.uid).set(user.toFirestore());
+    await _firestore
+        .collection(_collectionName)
+        .doc(user.uid)
+        .set(user.toFirestore());
   }
-  
+
   // Créer un utilisateur si n'existe pas
   Future<void> creerUtilisateurSiExistePas({
     required String uid,
@@ -99,17 +135,20 @@ class UserService {
       });
     }
   }
-  
+
   // Mettre à jour un utilisateur
   Future<void> updateUser(UserModel user) async {
-    await _firestore.collection(_collectionName).doc(user.uid).update(user.toFirestore());
+    await _firestore
+        .collection(_collectionName)
+        .doc(user.uid)
+        .update(user.toFirestore());
   }
-  
+
   // Supprimer un utilisateur
   Future<void> deleteUser(String uid) async {
     await _firestore.collection(_collectionName).doc(uid).delete();
   }
-  
+
   // Compter le nombre d'utilisateurs
   Future<int> countUsers() async {
     final snapshot = await _firestore
@@ -119,14 +158,14 @@ class UserService {
         .get();
     return snapshot.count ?? 0;
   }
-  
+
   // Mettre à jour les emprunts qui sont actifs
   Future<void> incrementerEmpruntsActifs(String userId, int nombre) async {
     await _firestore.collection(_collectionName).doc(userId).update({
       'nbEmpruntsActifs': FieldValue.increment(nombre),
     });
   }
-  
+
   Future<void> decrementerEmpruntsActifs(String userId, int nombre) async {
     await _firestore.collection(_collectionName).doc(userId).update({
       'nbEmpruntsActifs': FieldValue.increment(-nombre),

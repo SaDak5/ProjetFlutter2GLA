@@ -176,7 +176,7 @@ class _MainPageState extends State<MainPage>
       backgroundColor: const Color(0xFFF8F9FA),
       appBar: AppBar(
         title: const Text(
-          'Mediacité',
+          'Libcity',
           style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
         ),
         backgroundColor: const Color(0xFF003366),
@@ -547,22 +547,22 @@ class _MainPageState extends State<MainPage>
                             _buildInfoRow(
                               Icons.access_time,
                               'Horaires',
-                              'Lun-Sam: 10h-19h / Dim: 14h-18h',
+                              'Lun-Sam: 10h-19h / Dim: fermé',
                             ),
                             const Divider(height: 24),
                             _buildInfoRow(
                               Icons.location_on,
                               'Adresse',
-                              '12 rue de la Médiathèque, 75001 Paris',
+                              'Rue mongi bali ,8070, Tunis',
                             ),
                             const Divider(height: 24),
                             _buildInfoRow(
-                                Icons.phone, 'Téléphone', '01 23 45 67 89'),
+                                Icons.phone, 'Téléphone', '70266820'),
                             const Divider(height: 24),
                             _buildInfoRow(
                               Icons.email,
                               'Email',
-                              'contact@mediacite.fr',
+                              'contact@Libcity.fr',
                             ),
                           ],
                         ),
